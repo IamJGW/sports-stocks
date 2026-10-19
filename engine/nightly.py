@@ -132,8 +132,9 @@ def dividend_cents(shares, points, rate, boost):
 
 # ---- Fair values and the weekly re-check
 
-def season_so_far(conn, through_week=None):
-    """Per listed athlete: (team games played, fantasy points so far, negative games counted as zero)."""
+def season_so_far(conn, through_week=None, promise_by_week=None):
+    """Per listed athlete: (team games played, fantasy points so far with negative games counted as zero, promised
+    games). Promised games add up each team game's weekly promise (1 for every game when there's no promise row)."""
     q = "SELECT id, week, home, away FROM games WHERE processed_at IS NOT NULL"
     if through_week is not None:
         q += f" AND week <= {int(through_week)}"
@@ -150,14 +151,16 @@ def season_so_far(conn, through_week=None):
     for a in conn.execute("SELECT id, team FROM athletes"):
         apps = sorted(seen.get(a["id"], []))
         points = sum(max(0.0, p) for _, _, p in apps)
-        team_games = 0
+        team_games = promised = 0
         for w, teams in teams_by_week.items():
             # His team that week: the last team he played for up to then, else the first he played for later,
             # else last season's team (an athlete who hasn't played at all this season).
             earlier = [t for wk, t, _ in apps if wk <= w]
             team = earlier[-1] if earlier else (apps[0][1] if apps else a["team"])
-            team_games += team in teams
-        out[a["id"]] = (team_games, points)
+            if team in teams:
+                team_games += 1
+                promised += week_promise(promise_by_week, w)
+        out[a["id"]] = (team_games, points, promised)
     return out
 
 
@@ -166,7 +169,7 @@ def update_fair_values(conn, day, econ):
     mult = {r["name"]: r["multiplier"] for r in conn.execute("SELECT * FROM groups")}
     so_far = season_so_far(conn)
     for a in conn.execute("SELECT id, grp, prior_ptg FROM athletes").fetchall():
-        tg, pts = so_far[a["id"]]
+        tg, pts, _ = so_far[a["id"]]
         ptg = pricing.expected_ptg(a["prior_ptg"], mult[a["grp"]], pts, tg, econ)
         fv = max(0.01, pricing.fair_value(ptg, rate, econ, sport))
         conn.execute("UPDATE athletes SET fair_value = ? WHERE id = ?", (fv, a["id"]))
@@ -185,15 +188,22 @@ def weeks_just_finished(conn):
     return [r["week"] for r in rows]
 
 
+def week_promise(promise_by_week, week):
+    """A week's share of the season's promise (Live Rules sheet); 1 outside weeks 1-18 or with no promise row."""
+    if promise_by_week and 1 <= week <= len(promise_by_week):
+        return promise_by_week[week - 1]
+    return 1.0
+
+
 def run_recheck(conn, week, econ):
-    so_far = season_so_far(conn, through_week=week)
+    so_far = season_so_far(conn, through_week=week, promise_by_week=econ["live"].get("promise_by_week"))
     results = []
     for g in conn.execute("SELECT * FROM groups ORDER BY name").fetchall():
         actual = promised = 0.0
         for a in conn.execute("SELECT id, prior_ptg FROM athletes WHERE grp = ?", (g["name"],)):
-            tg, pts = so_far[a["id"]]
+            _, pts, promised_games = so_far[a["id"]]
             actual += pts
-            promised += a["prior_ptg"] * tg
+            promised += a["prior_ptg"] * promised_games
         new, ratio = pricing.recheck(g["multiplier"], week, actual, promised, econ)
         conn.execute("UPDATE groups SET multiplier = ? WHERE name = ?", (new, g["name"]))
         conn.execute("INSERT INTO group_checks VALUES (?,?,?,?,?,?)", (week, g["name"], actual, promised, ratio, new))

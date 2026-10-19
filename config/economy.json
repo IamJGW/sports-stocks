@@ -106,6 +106,26 @@
     "recheck_max_move": 0.05,
     "recheck_floor": 0.8,
     "recheck_ceiling": 1.2,
-    "playoff_boost": 1.5
+    "playoff_boost": 1.5,
+    "promise_by_week": [
+      1.18,
+      1.12,
+      1.07,
+      1.04,
+      1.02,
+      1.01,
+      1,
+      1,
+      0.99,
+      0.99,
+      0.99,
+      0.99,
+      0.99,
+      0.99,
+      0.99,
+      0.99,
+      0.99,
+      0.64
+    ]
   }
 }

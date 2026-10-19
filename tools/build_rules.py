@@ -57,6 +57,7 @@ def build(econ):
     bid, ask = MM.quote(target, 0, step, mm)
 
     k, kw = live["blend_games"], live["recheck_weeks"]
+    pb = live.get("promise_by_week") or [1.0] * 18
 
     rows = "\n".join(
         f"<tr><td>{LABELS[key][0]}</td><td class=num>{'+' if v > 0 else ''}{pts(v)}"
@@ -220,6 +221,9 @@ on its own.</p>
 <p>After the Monday night game, the game checks each position group against what it has actually paid this season.
 If wide receivers as a whole are paying 15% more than promised, their prices rise a little. A slow group gets cheaper.</p>
 <ul>
+  <li>Each week is compared with what that week should pay. Early in the season nearly everyone is healthy, so week 1
+  is expected to pay {pb[0]:.2f}× an average week; injuries add up, so from week 7 on it's about {pb[8]:.2f}×, and
+  week 18, when teams rest starters, {pb[17]:.2f}×. A hot September alone doesn't make a group dearer.</li>
   <li>Early on, one hot week barely counts: the old estimate is worth {kw} weeks of evidence.</li>
   <li>It moves at most {live['recheck_max_move']:.0%} a week, and stays between {live['recheck_floor']:.0%} and
   {live['recheck_ceiling']:.0%} of the original estimate.</li>

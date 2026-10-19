@@ -260,6 +260,15 @@ If that's right, the re-check is chasing a pattern that reverses. Checking it ne
 (about 270 games) to see whether 2025 ran hot early too; if so, the fix is to promise by week (an availability
 curve) instead of a flat share of every game.
 
+**Checked 2026-10-19:** 2025 did the same (played share 86% in weeks 1-2, about 73% from week 5, 59% in week 18).
+A curve fitted on 2025 predicted 2026's played share out of sample and explains about 8 of 2026's 14 points of
+excess. Proposal and checks in `research/AVAILABILITY_CURVE.md`. **Option A adopted 2026-10-19:** the weekly re-check
+now weighs each team game by its week's promise (new table on the Live Rules sheet, `promise_by_week` in
+`config/economy.json`), copied into the real save with `tools/apply_live_rules.py`. Weeks 1-5's re-checks stay as
+they ran; the re-check after week 6 uses the curve on the whole season so far (previewed with 13 of 14 games:
+multipliers 1.062/1.023/1.102 -> about 1.03/0.98/1.06, average price $55.45 -> $54.74). Option B (curve in prices
+too) waits for a 2024 check.
+
 ## Progress, steps 5 and 6 (2026-10-18)
 
 Built and tested (`python3 tests/run.py`, 36 tests).

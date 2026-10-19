@@ -60,6 +60,14 @@ LIVE_RULES = [
     ("Re-check: ceiling", 1.2, "0.00", "The group multiplier never goes above this."),
     ("Playoff dividend boost", 1.5, "0.00", "Playoff games pay this many times the normal dividend."),
 ]
+# NFL promise by week (weeks 1-18), on the Live Rules sheet. Listed athletes play in about 88% of their teams' games
+# in week 1 but only about 74% from week 6 (injuries pile up), and teams rest starters in week 18. The repeat factors
+# promise the season-long share every week, so the weekly re-check compares each week with its own share instead.
+# Fitted on 2025 and checked on 2026 (research/AVAILABILITY_CURVE.md). Averages 1 over a season's team games, so
+# the repeat factors still set the season total. All 1s = the old flat promise.
+PROMISE_BY_WEEK = [1.18, 1.12, 1.07, 1.04, 1.02, 1.01, 1.00, 1.00, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99,
+                   0.99, 0.64]
+PROMISE_LABEL = "NFL promise by week (re-check)"
 G0 = 19  # first group row on Settings
 G1 = G0 + len(GROUPS) - 1
 
@@ -694,10 +702,22 @@ def build():
         "A game his team played without him counts as zero, so an injury pulls his price down by itself.",
         "Fair value = expected points per team game x games per team x dividend rate / season weeks / weekly yield.",
         "Weekly re-check, after each NFL week: paid vs promised = the group's actual points / what the prior expected for the "
-        "same team games. Multiplier = (weeks x paid vs promised + re-check weight) / (weeks + re-check weight), moved at "
+        "same team games, each team game weighted by its week's promise (table below). Multiplier = (weeks x paid vs promised + re-check weight) / (weeks + re-check weight), moved at "
         "most the weekly limit from last week's and kept between the floor and ceiling.",
     ]):
         font(live.cell(row=12 + i, column=1, value=text), bold=(i == 0), italic=(i > 0))
+    P0 = 19
+    font(live.cell(row=P0, column=1, value=PROMISE_LABEL), bold=True)
+    font(live.cell(row=P0, column=3, value=(
+        "Share of the season's promise expected in each week's games. Early weeks run hot (most listed athletes are "
+        "healthy), week 18 cold (starters rested). Keep the average near 1; all 1s turns it off. Used only by the "
+        "weekly re-check.")), italic=True, color="555555")
+    header(live, P0 + 1, ["Week", "Promise x", ""])
+    for i, v in enumerate(PROMISE_BY_WEEK):
+        font(live.cell(row=P0 + 2 + i, column=1, value=i + 1))
+        c = live.cell(row=P0 + 2 + i, column=2, value=v)
+        font(c, color=BLUE)
+        c.number_format = "0.00"
     live.column_dimensions["A"].width = 44
     live.column_dimensions["B"].width = 10
     live.column_dimensions["C"].width = 110

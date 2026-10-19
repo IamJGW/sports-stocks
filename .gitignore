@@ -9,3 +9,5 @@ Stat Street Economy.xlsx
 # the real game (changes every morning) and the weekly check workbooks rebuilt from it
 save/
 checks/
+# 2025 ESPN downloads for research/ (availability study)
+data/espn_nfl_2025/

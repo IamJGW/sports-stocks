@@ -13,6 +13,7 @@ Fantasy sports dressed as a stock exchange. Design and roadmap: `PROJECT_PLAN.md
 | Replay as if it were a past morning | `python3 tools/nightly.py --as-of 2026-10-12` |
 | Use only saved box scores | `python3 tools/nightly.py --offline` |
 | Copy the workbook's levers into the game (also rebuilds the rules page) | `python3 tools/export_economy.py` |
+| Copy changed Live Rules levers into the running game (keeps a copy of the save first) | `python3 tools/apply_live_rules.py` |
 | Rebuild the "How it works" page, `web/rules.html` (also the app's How it works tab) | `python3 tools/build_rules.py` |
 | Rebuild the economy workbook | `python3 tools/build_economy_workbook.py` |
 | Play (screens at http://localhost:8660) | `python3 serve.py` |
@@ -50,4 +51,6 @@ To start over, move `save/` aside and run `new_game.py` again.
   The nightly job writes it for the weeks it processes.
 - `adapters/espn_nfl.py`: the only code that knows ESPN's feed. Downloads are kept in `data/espn_nfl_2026/`.
 - `config/economy.json`: the levers, exported from the workbook. Don't edit by hand; edit the workbook and export.
+  A save keeps the levers it started with; `tools/apply_live_rules.py` copies changed Live Rules levers into it.
+- `research/`: studies behind rule changes (e.g. `AVAILABILITY_CURVE.md`, the NFL promise by week).
 - `tests/`: every money rule has a test. `tests/fixtures/` holds one real box score.

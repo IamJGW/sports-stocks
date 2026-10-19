@@ -112,7 +112,8 @@ def recheck(previous, weeks_played, actual, promised, econ):
 
     actual: the group's listed athletes' fantasy points so far this season (negative games count as zero, like
     dividends). promised: what the prior expected for the same team games (prior_ptg x team games, before any
-    multiplier). Returns (new multiplier, paid vs promised).
+    multiplier, each team game weighted by its week's promise from the Live Rules sheet). Returns (new multiplier,
+    paid vs promised).
     """
     lv = econ["live"]
     if promised <= 0 or weeks_played <= 0:

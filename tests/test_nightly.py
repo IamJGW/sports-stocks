@@ -92,3 +92,71 @@ class Nightly(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PromiseByWeek(unittest.TestCase):
+    """The weekly re-check weighs each team game by its week's promise (Live Rules sheet)."""
+
+    def setUp(self):
+        self.c = new_market()
+        rows = self.c.execute("SELECT * FROM athletes ORDER BY start_price DESC").fetchall()
+        self.a = rows[0]
+        self.b = next(r for r in rows if r["team"] != self.a["team"])
+        self.feed = FakeFeed()
+        self.feed.add_game("g1", 1, eastern(2026, 9, 13, 13), self.a["team"], self.b["team"], {
+            self.a["id"]: (self.a["team"], {"rush_yd": 100, "rush_td": 2, "rec": 3, "rec_yd": 25}),
+        })
+
+    def week_one(self, promise):
+        econ = L.economy(self.c)
+        if promise is None:
+            econ["live"].pop("promise_by_week", None)
+        else:
+            econ["live"]["promise_by_week"] = promise
+        L.set_meta(self.c, "economy", econ)
+        N.sync_schedule(self.c, self.feed, weeks=[1])
+        now = eastern(2026, 9, 14, 4)
+        [report] = [N.process_day(self.c, d, N.fetch_day(self.c, d, self.feed), now)
+                    for d in N.days_to_process(self.c, L.eastern_day(now))]
+        return {g["group"]: g for g in report["group_checks"]}
+
+    def test_flat_row_is_the_old_rule(self):
+        none = self.week_one(None)
+        teams = {self.a["team"], self.b["team"]}
+        g = self.a["grp"]
+        expect = sum(r["prior_ptg"] for r in self.c.execute("SELECT prior_ptg, team FROM athletes WHERE grp = ?", (g,))
+                     if r["team"] in teams)
+        self.assertAlmostEqual(none[g]["promised"], expect, places=9)
+        self.c = new_market()
+        flat = self.week_one([1.0] * 18)
+        for g in flat:
+            self.assertEqual(flat[g]["promised"], none[g]["promised"])
+            self.assertEqual(flat[g]["after"], none[g]["after"])
+
+    def test_week_one_promises_more(self):
+        flat = self.week_one(None)
+        self.c = new_market()
+        curve = self.week_one([1.18] + [1.0] * 17)
+        for g in flat:
+            self.assertAlmostEqual(curve[g]["promised"], flat[g]["promised"] * 1.18, places=9)
+            if flat[g]["ratio"] is not None:
+                self.assertAlmostEqual(curve[g]["ratio"], flat[g]["ratio"] / 1.18, places=9)
+
+    def test_weeks_outside_the_row_count_as_one(self):
+        self.assertEqual(N.week_promise([0.5] * 18, 19), 1.0)
+        self.assertEqual(N.week_promise(None, 3), 1.0)
+        self.assertEqual(N.week_promise([0.5] * 18, 18), 0.5)
+
+
+class ApplyLiveRules(unittest.TestCase):
+    def test_copies_only_live_levers(self):
+        from tools import apply_live_rules
+        c = new_market()
+        before = L.economy(c)
+        live = dict(before["live"], promise_by_week=[1.1] * 18, recheck_weeks=9)
+        changed = apply_live_rules.apply(c, live)
+        self.assertEqual({k for k, _, _ in changed}, {"promise_by_week", "recheck_weeks"})
+        after = L.economy(c)
+        self.assertEqual(after["live"], live)
+        self.assertEqual({k: v for k, v in after.items() if k != "live"}, {k: v for k, v in before.items() if k != "live"})
+        self.assertEqual(apply_live_rules.apply(c, live), [])

@@ -25,6 +25,21 @@ def by_label(ws, label, col=2):
     sys.exit(f"Couldn't find '{label}' on the {ws.title} sheet.")
 
 
+def promise_by_week(ws, label="NFL promise by week (re-check)"):
+    """The 18 weekly values under the label's 'Week | Promise x' header, as a list for weeks 1 to 18."""
+    for row in ws.iter_rows(min_col=1, max_col=1):
+        if row[0].value == label:
+            r0 = row[0].row + 2
+            out = []
+            for i in range(18):
+                week, v = ws.cell(row=r0 + i, column=1).value, ws.cell(row=r0 + i, column=2).value
+                if week != i + 1 or not isinstance(v, (int, float)) or v < 0:
+                    sys.exit(f"'{ws.title}' {label}: row for week {i + 1} reads {week!r}, {v!r}")
+                out.append(v)
+            return out
+    sys.exit(f"Couldn't find '{label}' on the {ws.title} sheet.")
+
+
 def export(book=BOOK):
     wb = load_workbook(book)
     st, sc, mm, live = wb["Settings"], wb["Scoring"], wb["Market Maker"], wb["Live Rules"]
@@ -45,6 +60,7 @@ def export(book=BOOK):
             "recheck_floor": by_label(live, "Re-check: floor"),
             "recheck_ceiling": by_label(live, "Re-check: ceiling"),
             "playoff_boost": by_label(live, "Playoff dividend boost"),
+            "promise_by_week": promise_by_week(live),
         },
     }
     # Per sport: the row whose first cell is the sport's key, under the "Per sport" header.
