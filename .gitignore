@@ -6,3 +6,6 @@ data/espn_nfl_2026/
 # rebuilt by tools/build_economy_workbook.py
 Stat Street Economy.xlsx
 ~$*.xlsx
+# the real game (changes every morning) and the weekly check workbooks rebuilt from it
+save/
+checks/
