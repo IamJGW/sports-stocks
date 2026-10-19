@@ -1,0 +1,8 @@
+.DS_Store
+__pycache__/
+*.pyc
+# raw ESPN downloads (re-fetched on request)
+data/espn_nfl_2026/
+# rebuilt by tools/build_economy_workbook.py
+Stat Street Economy.xlsx
+~$*.xlsx
