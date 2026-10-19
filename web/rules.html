@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Sports Stocks Works</title>
+<style>
+:root {
+  --bg: #f7f7f4; --card: #ffffff; --ink: #1d232b; --muted: #5d6673; --line: #dde1e6;
+  --accent: #1f5fa8; --good: #1b7a46; --bad: #a33a2b; --tint: #eef3fa;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14171b; --card: #1c2026; --ink: #e8eaed; --muted: #9aa3ae; --line: #2e343c;
+    --accent: #79aef0; --good: #5ec98d; --bad: #f08a7a; --tint: #1f2a38;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14171b; --card: #1c2026; --ink: #e8eaed; --muted: #9aa3ae; --line: #2e343c;
+  --accent: #79aef0; --good: #5ec98d; --bad: #f08a7a; --tint: #1f2a38;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+main { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 1.7rem; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 20px; }
+nav { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 24px; font-size: .92rem; }
+nav a, a { color: var(--accent); }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 18px 8px;
+  margin: 0 0 16px; }
+h2 { font-size: 1.2rem; margin: 0 0 8px; }
+h3 { font-size: 1rem; margin: 16px 0 4px; }
+p, li { margin: 0 0 10px; }
+ul { padding-left: 20px; margin: 0 0 10px; }
+.sum { background: var(--tint); border-radius: 10px; padding: 12px 14px; margin: 8px 0 14px; }
+.sum .line { display: flex; justify-content: space-between; gap: 12px; }
+.sum .total { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 6px; font-weight: 600; }
+.formula { font-weight: 600; background: var(--tint); border-radius: 8px; padding: 10px 12px; margin: 6px 0 12px; }
+table { border-collapse: collapse; width: 100%; margin: 4px 0 14px; font-size: .95rem; }
+td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.note { color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>How Sports Stocks works</h1>
+<p class="sub">Every number on this page comes from the game's current settings.</p>
+<nav>
+  <a href="#idea">The idea</a><a href="#trading">Buying and selling</a><a href="#dividends">Dividends</a>
+  <a href="#prices">Why prices move</a><a href="#winning">Net worth</a><a href="#day">A day in the game</a>
+</nav>
+
+<section id="idea">
+<h2>The idea</h2>
+<p>Every listed NFL quarterback, running back, wide receiver and tight end (120 of them) is a stock with
+a short ticker, like <b>Josh Allen</b>. You start with <b>$100,000</b> of play money. Buy shares of
+the athletes you think will play well. When they play, you're paid a <b>dividend</b> for every share you hold, and
+their share price moves with how they're playing.</p>
+<p>Nobody owns an athlete outright: any number of players can hold the same star. It's play money only, just for
+bragging rights.</p>
+</section>
+
+<section id="trading">
+<h2>Buying and selling</h2>
+<p>You trade with the <b>market maker</b>, a computer trader run by the game. It's always there with two prices for
+each athlete:</p>
+<ul>
+  <li><b>Buy price:</b> what you pay for a share.</li>
+  <li><b>Sell price:</b> what you get for a share.</li>
+</ul>
+<p>The two are 4% apart. For an athlete worth $50.00, you'd buy at about $51.00 and sell
+at about $49.00. So buying and selling straight back always loses a little. The game is for picking athletes
+who will do well, not for flipping shares.</p>
+<h3>The more people own, the higher the price</h3>
+<p>Every $5,000 worth of an athlete that players hold pushes his price up
+1%. Selling brings it back down. Each share in a big order is priced one at a time, so a big
+order costs more per share than a small one. The game shows you the total, the average price and his price after
+your trade before you confirm.</p>
+<p>There's no limit on how much of one athlete you can own, but it gets expensive. Put all $100,000 into one
+$50.00 athlete and you get <b>1,791 shares</b>, not 2,000, at an average of
+$55.82. His price ends up at $59.75. Sell it all straight back and you'd get
+$96,060.</p>
+<h3>No trading during his game</h3>
+<p>Once an athlete's game kicks off, the market maker stops trading him until the overnight update. Otherwise you
+could watch a three-touchdown first half and buy at yesterday's price.</p>
+</section>
+
+<section id="dividends">
+<h2>Dividends: how you get paid</h2>
+<p>After each game, the athlete's stats are turned into <b>fantasy points</b> (half-point-per-catch scoring):</p>
+<table>
+<tr><th>Each</th><th class="num">Points</th></tr>
+<tr><td>Passing yard</td><td class=num>+0.04 (0.4 per 10 yards)</td></tr>
+<tr><td>Passing touchdown</td><td class=num>+4</td></tr>
+<tr><td>Interception thrown</td><td class=num>-2</td></tr>
+<tr><td>Rushing yard</td><td class=num>+0.1 (1 per 10 yards)</td></tr>
+<tr><td>Rushing touchdown</td><td class=num>+6</td></tr>
+<tr><td>Catch</td><td class=num>+0.5</td></tr>
+<tr><td>Receiving yard</td><td class=num>+0.1 (1 per 10 yards)</td></tr>
+<tr><td>Receiving touchdown</td><td class=num>+6</td></tr>
+<tr><td>Two-point conversion</td><td class=num>+2</td></tr>
+<tr><td>Kick or punt return touchdown</td><td class=num>+6</td></tr>
+<tr><td>Fumble lost</td><td class=num>-2</td></tr>
+</table>
+<p>Then the points are turned into money:</p>
+<div class="formula">Dividend per share = fantasy points × $0.1136</div>
+<div class="formula">You're paid = dividend per share × shares you held at the start of game day</div>
+<h3>Example</h3>
+<p>You own 100 shares of a quarterback. He throws for 300 yards, 3 touchdowns and
+1 interception, and runs for 20 yards.</p>
+<div class="sum">
+  <div class="line"><span>300 passing yards × 0.04</span><span class="num">12 pts</span></div>
+  <div class="line"><span>3 passing touchdowns × 4</span><span class="num">12 pts</span></div>
+  <div class="line"><span>1 interception × -2</span><span class="num">-2 pts</span></div>
+  <div class="line"><span>20 rushing yards × 0.1</span><span class="num">2 pts</span></div>
+  <div class="line total"><span>Fantasy points</span><span class="num">24 pts</span></div>
+  <div class="line"><span>× $0.1136 per point</span><span class="num">$2.7272 a share</span></div>
+  <div class="line total"><span>× 100 shares</span><span class="num">$272.72</span></div>
+</div>
+<h3>The fine print</h3>
+<ul>
+  <li><b>Who gets paid:</b> whoever held the shares at <b>midnight Eastern</b> at the start of game day. Buying on
+  Sunday morning doesn't get you Sunday's games; buying on Saturday night does. Selling on Sunday morning still gets
+  you Sunday's dividend.</li>
+  <li><b>Bad games:</b> a game with negative points pays nothing. It never costs you money.</li>
+  <li><b>Playoffs:</b> playoff games pay 1.5× the normal dividend.</li>
+  <li><b>When:</b> dividends land in your cash in the overnight update after the game.</li>
+  <li><b>Stat corrections:</b> the NFL sometimes fixes stats days later. The game pays once, on the box score at the
+  time, and doesn't take money back or top it up.</li>
+</ul>
+<p class="note">Why $0.1136? It's set so the average listed athlete, at an average price of
+$50.00, pays about 2% of his price in dividends each week of the season ($1.00 a share a
+week). Dividends alone won't make you rich; picking the athletes who beat expectations will.</p>
+</section>
+
+<section id="prices">
+<h2>Why prices move</h2>
+<p>Each athlete has a <b>fair value</b>: what his dividends are expected to be worth. The market maker's prices sit
+around it.</p>
+<div class="formula">Fair value = expected weekly dividend ÷ 2%</div>
+<h3>Where the starting price comes from</h3>
+<p>Last season's points per game, adjusted for two things that tend to happen the next year: stars cool off a bit
+and weaker players catch up a bit (<b>lean toward the group average</b>), and athletes miss games and fall back
+(<b>repeat factor</b>). Each position group has its own:</p>
+<table>
+<tr><th>Group</th><th class="num">Lean to average</th><th class="num">Repeat factor</th></tr>
+<tr><td>QB</td><td class=num>7%</td><td class=num>66%</td></tr>
+<tr><td>RB</td><td class=num>30%</td><td class=num>77%</td></tr>
+<tr><td>WR/TE</td><td class=num>38%</td><td class=num>69%</td></tr>
+</table>
+<p>Example, Josh Allen: 21.45 points a game last season, leaned to
+21.03, times the 66% repeat factor gives 13.88 expected
+points a game. Over 17 games at $0.1136 a point and 18 weeks, that's $1.49 a week, and
+$1.49 ÷ 2% = <b>$74.47</b>.</p>
+<h3>Every night: this season counts more and more</h3>
+<p>After each game day, the expected points blend last season's estimate with what he has actually scored this
+season. Last season starts out worth 4 games. After 4 games this season counts the same, and by week 12 it
+counts three times as much. A game his team played without him counts as zero, so an injury pulls his price down
+on its own.</p>
+<h3>Every week: re-checking each group</h3>
+<p>After the Monday night game, the game checks each position group against what it has actually paid this season.
+If wide receivers as a whole are paying 15% more than promised, their prices rise a little. A slow group gets cheaper.</p>
+<ul>
+  <li>Early on, one hot week barely counts: the old estimate is worth 8 weeks of evidence.</li>
+  <li>It moves at most 5% a week, and stays between 80% and
+  120% of the original estimate.</li>
+  <li>The market report shows each week's re-check.</li>
+</ul>
+<h3>And what players do</h3>
+<p>On top of fair value, buying pushes an athlete's price up and selling pushes it down (see
+<a href="#trading">Buying and selling</a>).</p>
+</section>
+
+<section id="winning">
+<h2>Net worth: how you're scored</h2>
+<div class="formula">Net worth = cash + what selling all your shares would bring right now</div>
+<p>Your shares are valued at what the market maker would actually pay for all of them, at the sell price and
+including the drop a big sale causes. So buying a pile of one athlete to push his price up never makes you look
+richer than you are.</p>
+</section>
+
+<section id="day">
+<h2>A day in the game</h2>
+<ul>
+  <li><b>During the day:</b> trade whenever you like, except athletes whose game has started.</li>
+  <li><b>Overnight:</b> the game reads the box scores, checks that they add up, pays dividends, updates every fair
+  value, and writes the <b>market report</b>: biggest dividends, biggest price moves, and how your portfolio did.
+  If a box score looks wrong, nothing is paid until it's fixed.</li>
+</ul>
+</section>
+</main>
+</body>
+</html>

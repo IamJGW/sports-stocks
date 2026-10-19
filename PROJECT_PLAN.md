@@ -225,5 +225,6 @@ Milestone 0 is done. Milestone 1's plan is `MILESTONE_1_PLAN.md`.
 
 ## Next step
 
-Justin reviews `MILESTONE_1_PLAN.md`, answers its "Decisions for you before I start", and OKs the ESPN downloads. Then
-building starts with step 1 (the workbook's new levers and the export).
+Milestone 1 steps 1 to 4 are built (see `MILESTONE_1_PLAN.md`, "Progress"). Next: the screens (step 5) and the
+hand-check workbook (step 6), then Justin plays a real week. Open question from the build: the early-season NFL
+groups pay well above their promise; checking whether that's a pattern needs 2025's weekly box scores.

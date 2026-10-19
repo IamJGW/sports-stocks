@@ -1,6 +1,7 @@
 # Sports Stocks, Milestone 1: the solo NFL prototype
 
-Written 2026-10-18. Status: **plan for Justin's review; nothing built yet.**
+Written 2026-10-18. Status: **steps 1 to 6 built (2026-10-18); the playtest week (step 7) is yours to play.** Justin took
+every default in "Decisions for you" and gave a standing OK for ESPN box-score fetches during this milestone.
 
 ## Goal
 
@@ -232,3 +233,48 @@ Still open but not needed for Milestone 1: **should fair value fall as the seaso
 playoff dividends but not this half. Under the current rule an athlete's price doesn't know that only 2 weeks are
 left, so late in the season everyone is overpriced compared with what they can still pay. It matters for the friends
 beta (December to March crosses the end of the NFL season), so I'll bring it back before Milestone 3.
+
+## Progress (2026-10-18)
+
+Steps 1 to 4 are built and tested (`python3 tests/run.py`, 27 tests). See `README.md` for the commands.
+
+- **Step 1:** the workbook has a Live Rules sheet (blend weight, re-check settings, playoff boost) and the Market
+  Maker sheet's step is now in dollars. `tools/export_economy.py` writes `config/economy.json`. The Python starting
+  prices equal the recalculated workbook's to within a millionth of a cent.
+- **Step 2:** `engine/ledger.py` and `engine/market_maker.py`. Trades and dividends can't be edited or deleted (the
+  database refuses). Tested: round trips always lose, cents round against the player, no overspending or
+  overselling, a moved price is refused, the step-out window, net worth at liquidation value.
+- **Step 3:** `adapters/espn_nfl.py`. Before paying it checks that each game is final, the athletes' rows add up to
+  the team totals, every yard thrown was caught, and the numbers are believable. All 91 finished 2026 games passed.
+- **Step 4:** `tools/nightly.py`. The real save (`save/game.sqlite`) is caught up through week 5 and Thursday of week 6
+  (80 games). Sunday's week 6 games pay on the next morning's run.
+- **Correction to the plan:** the season was in week 6, not week 7, on 2026-10-18 (it started Wednesday 9 Sept).
+- **Team changes:** an athlete's team comes from the latest box score he appears in; six listed athletes haven't
+  played yet in 2026 and keep their 2025 team (Jacobs, Fields, Charbonnet, Flacco, Rattler, Mills).
+
+**A surprise to look at before the friends beta:** through week 5, every NFL group has paid well above its promise
+(QBs 116%, RBs 106%, WRs/TEs 127%), so the re-check has raised their multipliers to 1.06, 1.02 and 1.10 and the
+average price is up from $50 to about $56. The likely reason is that the repeat factors allow for a whole season of
+missed games, and injuries pile up late in the season, so the early weeks run hot and the late ones should run cold.
+If that's right, the re-check is chasing a pattern that reverses. Checking it needs 2025's week-by-week box scores
+(about 270 games) to see whether 2025 ran hot early too; if so, the fix is to promise by week (an availability
+curve) instead of a flat share of every game.
+
+## Progress, steps 5 and 6 (2026-10-18)
+
+Built and tested (`python3 tests/run.py`, 36 tests).
+
+- **Step 5, screens:** `serve.py` (port 8660, `--phone` for a phone on the Wi-Fi, `--save PATH` to try things on a
+  copy) serves `web/` and a small JSON API (`engine/api.py`). Market (search, position filter, sort, "in game"),
+  Athlete (buy/sell box with live preview, "All in" and "Sell all", game log, price history), Portfolio, Report. A
+  refused trade's message goes to the page as written by the ledger. The page never works out money. Checked in the
+  Browser pane at phone size against a copy of the save (a 100-share buy, preview equal to the fill). Added to
+  `launch.json` as `sports-stocks`; it uses the real save, so use `--save` on a copy for experiments.
+- **Step 6, hand check:** `tools/hand_check.py` writes `checks/nfl-2026-week-NN.xlsx` (Check, Scoring, Trades
+  sheets); `tools/nightly.py` writes the workbook for each week it touched. Scoring weights, rate and playoff boost
+  are blue inputs; points, per-share dividend, holdings at record time (from the Trades sheet) and payout are
+  formulas, compared with what the game paid ("match" or "MISMATCH", counts at the top). Recalculated with
+  LibreOffice. Replayed week 5 on a scratch save with buys, a sell and trades either side of record time: 88 lines,
+  0 mismatches, $1,119.85 paid and recalculated. Weeks 1 to 6 of the real save also give 0 mismatches (no trades yet).
+  A test edits a weight in the workbook and sees mismatches appear, so the formulas are live.
+- **Step 7:** survey written (`playtest/surveys/sports-stocks-m1-week.json`). Week 7 starts Thu 22 Oct.

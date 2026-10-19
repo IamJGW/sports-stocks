@@ -49,6 +49,17 @@ SPORTS = [
 GROUPS = [("NFL QB", "NFL", "QB", 0.07, 0.66), ("NFL RB", "NFL", "RB", 0.30, 0.77),
           ("NFL WR/TE", "NFL", "WR, TE", 0.38, 0.69), ("NBA", "NBA", "All", 0.10, 0.69),
           ("NHL skaters", "NHL", "C, LW, RW, D", 0.12, 0.84), ("NHL goalies", "NHL", "G", 0.65, 0.44)]
+# In-season levers on the Live Rules sheet: (label, default, number format, note). Read by tools/export_economy.py.
+LIVE_RULES = [
+    ("Blend weight (games)", 4, "0", "How many games of last season's form a fair value starts with. After this many "
+     "games this season counts as much as last season."),
+    ("Re-check weight (weeks)", 8, "0", "Weekly group re-check: how many weeks of evidence the old repeat factor is "
+     "worth. Higher = slower to re-price a hot or cold group."),
+    ("Re-check: most it can move in a week", 0.05, PCT, "The group multiplier moves at most this much per week."),
+    ("Re-check: floor", 0.8, "0.00", "The group multiplier never goes below this."),
+    ("Re-check: ceiling", 1.2, "0.00", "The group multiplier never goes above this."),
+    ("Playoff dividend boost", 1.5, "0.00", "Playoff games pay this many times the normal dividend."),
+]
 G0 = 19  # first group row on Settings
 G1 = G0 + len(GROUPS) - 1
 
@@ -495,7 +506,8 @@ def build():
     mm_in = [(4, "Buy-sell gap (spread)", 0.04, PCT, "Gap between the price players buy at and sell at. Stops flipping."),
              (5, "Price lean per step of league holdings", 0.01, PCT, "Each step of shares the league holds lifts the "
               "price this much; selling lowers it."),
-             (6, "Shares per step", 100, "0", "How many shares make one step."),
+             (6, "Dollars of fair value per step", 5000, MONEY0, "One step = this many dollars of the athlete's fair value "
+              "(at the start of the season), so cheap and expensive athletes are equally hard to push around."),
              (7, "Example fair value", 50, MONEY, "Any athlete's fair value; the tables below scale with it.")]
     for r, label, val, fmt, note in mm_in:
         font(mm.cell(row=r, column=1, value=label))
@@ -505,12 +517,15 @@ def build():
         if r in (4, 5):
             c.fill = YELLOW
         font(mm.cell(row=r, column=3, value=note), italic=True, color="555555")
+    font(mm.cell(row=8, column=1, value="Shares per step at this fair value"))
+    font(mm.cell(row=8, column=2, value="=$B$6/$B$7"))
+    mm.cell(row=8, column=2).number_format = "0"
     font(mm.cell(row=9, column=1, value="Quotes as league holdings change"), bold=True, size=11)
     header(mm, 10, ["Shares held by the league", "Middle price", "Players sell at (bid)", "Players buy at (ask)"])
     for i, held in enumerate(range(-500, 1001, 100)):
         R = 11 + i
         font(mm.cell(row=R, column=1, value=held), color=BLUE)
-        mm.cell(row=R, column=2, value=f"=$B$7*(1+$B$5)^(A{R}/$B$6)").number_format = MONEY
+        mm.cell(row=R, column=2, value=f"=$B$7*(1+$B$5)^(A{R}/$B$8)").number_format = MONEY
         mm.cell(row=R, column=3, value=f"=B{R}*(1-$B$4/2)").number_format = MONEY
         mm.cell(row=R, column=4, value=f"=B{R}*(1+$B$4/2)").number_format = MONEY
         for col_i in (2, 3, 4):
@@ -523,14 +538,14 @@ def build():
     for i in range(10):
         R = 11 + i
         font(mm.cell(row=R, column=6, value=i + 1))
-        vals = [f"=(F{R}-1)*$B$6", f"=$B$7*(1+$B$5)^(G{R}/$B$6)*(1+$B$4/2)", f"=H{R}*$B$6",
-                f"=(11-F{R})*$B$6", f"=$B$7*(1+$B$5)^(J{R}/$B$6)*(1-$B$4/2)", f"=K{R}*$B$6"]
+        vals = [f"=(F{R}-1)*$B$8", f"=$B$7*(1+$B$5)^(G{R}/$B$8)*(1+$B$4/2)", f"=H{R}*$B$8",
+                f"=(11-F{R})*$B$8", f"=$B$7*(1+$B$5)^(J{R}/$B$8)*(1-$B$4/2)", f"=K{R}*$B$8"]
         for j, v in enumerate(vals):
             cell = mm.cell(row=R, column=7 + j, value=v)
             font(cell)
             cell.number_format = "0" if j in (0, 3) else MONEY
     summary = [
-        (23, "Shares bought", "=10*$B$6", "0"),
+        (23, "Shares bought", "=10*$B$8", "0"),
         (24, "Total cost", "=SUM(I11:I20)", MONEY0),
         (25, "Value at the quoted sell price right after buying", "=G23*$B$7*(1+$B$5)^(10)*(1-$B$4/2)", MONEY0),
         (26, "Paper gain if valued at the quoted sell price", "=G25/G24-1", PCT),
@@ -658,8 +673,37 @@ def build():
         sim.column_dimensions[L(col_i)].width = w
     sim.row_dimensions[H0].height = 45
 
+    # ---- Live rules: the in-season levers the game reads (Milestone 1 onward).
+    live = wb.create_sheet("Live Rules")
+    title(live, "Live rules: how prices move during a real season",
+          "The game reads these blue cells (tools/export_economy.py). Starting prices come from last season, as on the "
+          "sport sheets; these rules take over once games are played.")
+    header(live, 3, ["Lever", "Value", "What it does"])
+    for i, (label, val, fmt, note) in enumerate(LIVE_RULES):
+        R = 4 + i
+        font(live.cell(row=R, column=1, value=label))
+        c = live.cell(row=R, column=2, value=val)
+        font(c, color=BLUE)
+        c.number_format = fmt
+        c.fill = YELLOW
+        font(live.cell(row=R, column=3, value=note), italic=True, color="555555")
+    for i, text in enumerate([
+        "How fair value moves in season:",
+        "Prior points per team game = leaned points per game (last season) x repeat factor x the group's re-check multiplier.",
+        "Expected points per team game = (blend weight x prior + this season's points) / (blend weight + team games played). "
+        "A game his team played without him counts as zero, so an injury pulls his price down by itself.",
+        "Fair value = expected points per team game x games per team x dividend rate / season weeks / weekly yield.",
+        "Weekly re-check, after each NFL week: paid vs promised = the group's actual points / what the prior expected for the "
+        "same team games. Multiplier = (weeks x paid vs promised + re-check weight) / (weeks + re-check weight), moved at "
+        "most the weekly limit from last week's and kept between the floor and ceiling.",
+    ]):
+        font(live.cell(row=12 + i, column=1, value=text), bold=(i == 0), italic=(i > 0))
+    live.column_dimensions["A"].width = 44
+    live.column_dimensions["B"].width = 10
+    live.column_dimensions["C"].width = 110
+
     # ---- Read Me
-    title(readme, "Stat Street economy workbook", "Milestone 0. Built 2026-10-16, position groups added 2026-10-17. Data: ESPN's public stats feed.")
+    title(readme, "Stat Street economy workbook", "Built 2026-10-16, position groups added 2026-10-17, live rules 2026-10-18. Data: ESPN's public stats feed.")
     lines = [
         ("What this is", True),
         ("A model of the game's money: how athletes are priced, how much they pay in dividends, and whether any sport or "
@@ -680,6 +724,8 @@ def build():
          False),
         ("Balance: average dividend return per sport, position group and position, against the target.", False),
         ("Market Maker: how the game's own trader quotes prices, and a test of whether one player can pump a price.", False),
+        ("Live Rules: how prices move during a real season (blend with this season's games, weekly group re-check, "
+         "playoff boost). The game reads these.", False),
         ("Season Sim: 20 friends with different strategies buy and hold for a season. Who wins, and by how much?", False),
         ("", False),
         ("Colour key", True),

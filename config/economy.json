@@ -1,0 +1,111 @@
+{
+  "starting_cash": 100000,
+  "target_price": 50,
+  "weekly_yield": 0.02,
+  "sports": {
+    "NFL": {
+      "weeks": 18,
+      "games": 17,
+      "min_games": 6,
+      "listed": 120,
+      "scoring": {
+        "pass_yd": 0.04,
+        "pass_td": 4,
+        "int": -2,
+        "rush_yd": 0.1,
+        "rush_td": 6,
+        "rec": 0.5,
+        "rec_yd": 0.1,
+        "rec_td": 6,
+        "two_pt": 2,
+        "ret_td": 6,
+        "fum_lost": -2
+      }
+    },
+    "NBA": {
+      "weeks": 25,
+      "games": 82,
+      "min_games": 25,
+      "listed": 150,
+      "scoring": {
+        "pts": 1,
+        "reb": 1.2,
+        "ast": 1.5,
+        "stl": 3,
+        "blk": 3,
+        "tov": -1,
+        "fg3m": 0,
+        "dbl_dbl": 0,
+        "tpl_dbl": 0
+      }
+    },
+    "NHL": {
+      "weeks": 27,
+      "games": 82,
+      "min_games": 25,
+      "listed": 150,
+      "scoring": {
+        "goals": 3,
+        "assists": 2,
+        "shots": 0.5,
+        "ppg": 0.5,
+        "ppa": 0.5,
+        "wins": 4,
+        "goals_against": -1,
+        "saves": 0.15,
+        "shutouts": 2
+      }
+    }
+  },
+  "groups": {
+    "NFL QB": {
+      "sport": "NFL",
+      "positions": "QB",
+      "lean": 0.07,
+      "repeat": 0.66
+    },
+    "NFL RB": {
+      "sport": "NFL",
+      "positions": "RB",
+      "lean": 0.3,
+      "repeat": 0.77
+    },
+    "NFL WR/TE": {
+      "sport": "NFL",
+      "positions": "WR, TE",
+      "lean": 0.38,
+      "repeat": 0.69
+    },
+    "NBA": {
+      "sport": "NBA",
+      "positions": "All",
+      "lean": 0.1,
+      "repeat": 0.69
+    },
+    "NHL skaters": {
+      "sport": "NHL",
+      "positions": "C, LW, RW, D",
+      "lean": 0.12,
+      "repeat": 0.84
+    },
+    "NHL goalies": {
+      "sport": "NHL",
+      "positions": "G",
+      "lean": 0.65,
+      "repeat": 0.44
+    }
+  },
+  "market_maker": {
+    "spread": 0.04,
+    "lean_per_step": 0.01,
+    "dollars_per_step": 5000
+  },
+  "live": {
+    "blend_games": 4,
+    "recheck_weeks": 8,
+    "recheck_max_move": 0.05,
+    "recheck_floor": 0.8,
+    "recheck_ceiling": 1.2,
+    "playoff_boost": 1.5
+  }
+}

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Runs the Sports Stocks morning update at 4:00 and 9:00 (the second is a retry; it does nothing if the first
+     worked). If the Mac is asleep then, it runs when the Mac wakes. Installed copy:
+     ~/Library/LaunchAgents/com.sportsstocks.morning.plist (see README.md for install and removal). -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sportsstocks.morning</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/justinwiles/Games_Dev/sports-exchange/tools/morning.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/justinwiles/Games_Dev/sports-exchange</string>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Hour</key>
+            <integer>4</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <dict>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+    </array>
+
+    <key>StandardOutPath</key>
+    <string>/Users/justinwiles/Games_Dev/sports-exchange/save/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/justinwiles/Games_Dev/sports-exchange/save/launchd.err.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
