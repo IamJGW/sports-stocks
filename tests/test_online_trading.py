@@ -32,7 +32,8 @@ class Trading(unittest.TestCase):
 
     def tearDown(self):
         online.reset_season()
-        for m in self.leagues:
+        for m in self.leagues:  # as the robot will: sweep against the reset prices, then check
+            self.robot.rpc("sweep_league", p_market=m)
             self.assertEqual(self.robot.rpc("check_league", p_market=m), [])
 
     # ---- helpers
@@ -171,6 +172,12 @@ class Trading(unittest.TestCase):
         self.robot.update("markets", {"mm": flat}, id=f"eq.{m}")
         got = self.order(self.p[1], m, A1, "buy", "limit", 15, 5000)
         self.assertEqual((got["filled"], got["from_players"], got["cents"]), (15, 10, 75000))
+        # No real league's levers change, so the self-check prices the first fill with the flat ones and flags it.
+        self.leagues.remove(m)
+        online.reset_season()
+        self.robot.rpc("sweep_league", p_market=m)
+        problems = self.robot.rpc("check_league", p_market=m)
+        self.assertEqual([p["problem"] for p in problems], ["market maker price"])
 
     def test_you_cant_trade_with_yourself(self):
         m = self.league(1)
@@ -301,6 +308,86 @@ class Trading(unittest.TestCase):
         value = MM.sell_proceeds_cents(50.0, 100, 100, 100.0, online.MM)
         self.assertEqual(board["P1"]["net_worth_cents"], START - cost + value)
         self.assertEqual(board["P2"]["net_worth_cents"], START)
+
+    # ---- found in the step 3 review (2026-10-29)
+
+    def test_a_market_preview_for_a_million_shares_says_what_the_cash_buys(self):
+        m = self.league(1)
+        got = self.order(self.p[0], m, A1, "buy", "market", 1_000_000, preview=True)
+        self.assertEqual(got["filled"], MM.most_affordable(50.0, 0, START, 100.0, online.MM))
+
+    def test_the_previews_worst_price_still_fills_when_a_share_is_a_hair_off_a_whole_cent(self):
+        # Shares are compared at 6 decimals, as in Python: a sale worth $48.9999997 shows as $49.00, a buy costing
+        # $51.0000003 as $51.00, and the real order guarded at that price must still get the share.
+        m = self.league(1)
+        self.market(self.p[0], m, A1, "buy", 1)
+        fv = (4900 - 3e-7) / 98
+        self.assertTrue(fv * 1.0 * (1 - 0.04 / 2) * 100 < 4900 == round(fv * (1 - 0.04 / 2) * 100, 6))
+        online.set_fair_value(A1, fv)
+        self.assertEqual(self.market(self.p[0], m, A1, "sell", 1)["filled"], 1)
+        fv = (5100 + 3e-7) / 102
+        self.assertTrue(fv * 1.0 * (1 + 0.04 / 2) * 100 > 5100 == round(fv * (1 + 0.04 / 2) * 100, 6))
+        online.set_fair_value(A1, fv)
+        self.assertEqual(self.market(self.p[0], m, A1, "buy", 1)["filled"], 1)
+
+    def test_a_waking_buy_doesnt_pay_a_friend_more_than_the_market_maker_asks(self):
+        m = self.league(2)
+        self.market(self.p[1], m, A1, "buy", 10)
+        self.order(self.p[0], m, A1, "buy", "limit", 10, 4500)  # waits (he asks $51), then sleeps through the game
+        self.in_game()
+        self.order(self.p[1], m, A1, "sell", "limit", 10, 4100)  # live, but the sleeping buy can't take it
+        online.set_fair_value(A1, 43.0)  # overnight he asks about $43.90: cheaper than $45.00, the older order's price
+        self.overnight(m)
+        me = self.account(self.p[0], m)["member_id"]
+        bought = self.rows("trades", market_id=f"eq.{m}", buyer_id=f"eq.{me}")
+        self.assertEqual(sum(t["shares"] for t in bought), 10)
+        self.assertEqual([t["seller_id"] for t in bought], [None] * len(bought))
+        self.assertLess(sum(t["cents"] for t in bought), 45000)
+
+    def test_nothing_fills_after_the_league_ends(self):
+        m = self.league(1)
+        self.order(self.p[0], m, A1, "buy", "limit", 10, 4500)
+        yesterday = (today() - timedelta(days=1)).isoformat()
+        self.robot.update("markets", {"starts_on": yesterday, "ends_on": yesterday}, id=f"eq.{m}")
+        online.set_fair_value(A1, 40.0)
+        self.assertEqual(self.robot.rpc("sweep_league", p_market=m), [])
+        self.robot.rpc("end_leagues", p_today=today().isoformat())
+
+    def test_a_market_buy_isnt_refused_for_your_sale_waiting_above_it(self):
+        m = self.league(1)
+        self.market(self.p[0], m, A1, "buy", 20)
+        self.order(self.p[0], m, A1, "sell", "limit", 10, 6000)
+        self.assertEqual(self.market(self.p[0], m, A1, "buy", 10)["filled"], 10)  # he asks about $51
+        self.refused(r"You have a sell waiting at \$60\.00", self.order, self.p[0], m, A1, "buy", "limit", 10, 6000)
+        online.set_fair_value(A1, 70.0)  # now your own sale is the cheapest share on offer
+        self.refused(r"You have a sell waiting at \$60\.00", self.order, self.p[0], m, A1, "buy", "market", 10,
+                     preview=True)
+
+    def test_a_player_goes_first_unless_the_market_maker_is_a_whole_cent_cheaper(self):
+        # Justin, 2026-10-29: a tie is judged in whole cents, since one share costs the buyer $52.00 either way.
+        m = self.league(2)
+        self.market(self.p[0], m, A1, "buy", 10)
+        self.order(self.p[0], m, A1, "sell", "limit", 10, 5200)
+        ask = ((1 + 0.01) ** (1 / 100.0)) ** 10 * (1 + 0.04 / 2)  # his 11th share's price per $1 of fair value
+        online.set_fair_value(A1, (5200 - 0.4) / 100 / ask)  # $51.996
+        got = self.order(self.p[1], m, A1, "buy", "limit", 5, 5200)
+        self.assertEqual(got["from_players"], 5)
+        online.set_fair_value(A1, (5200 - 1.4) / 100 / ask)  # $51.986: a whole cent cheaper
+        got = self.order(self.p[1], m, A1, "buy", "limit", 1, 5200)
+        self.assertEqual(got["from_players"], 0)
+
+    def test_check_league_catches_a_wrong_market_maker_price_and_a_crossed_book(self):
+        m = self.league(1)
+        self.leagues.remove(m)  # broken on purpose below
+        self.market(self.p[0], m, A1, "buy", 10)
+        me = self.account(self.p[0], m)["member_id"]
+        order = self.rows("orders", member_id=f"eq.{me}", select="id")[0]["id"]
+        self.robot.insert("trades", [{"market_id": m, "athlete_id": A1, "buyer_id": me, "shares": 1, "cents": 1,
+                                      "buy_order_id": order, "mm_fair_value": 50.0, "mm_held_before": 10}])
+        self.robot.insert("orders", [{"market_id": m, "member_id": me, "athlete_id": A1, "side": "buy",
+                                      "kind": "limit", "shares": 5, "limit_cents": 9000, "remaining": 5}])
+        problems = {p["problem"] for p in self.robot.rpc("check_league", p_market=m)}
+        self.assertLessEqual({"market maker price", "book crossed"}, problems)
 
 
 if __name__ == "__main__":

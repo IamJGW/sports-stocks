@@ -55,17 +55,38 @@ $$;
 
 -- How many shares the market maker trades with one order before something stops it: the order's price limit
 -- (cap, whole cents; null for none), a player's order at a price he can't beat (rival, whole cents: the market maker
--- must be strictly better, since players go first at the same price), the shares wanted, and the buyer's cash.
+-- must be a whole cent better, since players go first at the same price, judged in cents as the buyer pays them;
+-- Justin, 2026-10-29), the shares wanted, and the buyer's cash.
+-- A share's price is compared at 6 decimals, like the block totals and the preview's worst price, so a share the
+-- preview showed at $51.00 still fills when the order is guarded at $51.00.
+create function private.mm_buy_ok(fair_value double precision, held bigint, k bigint, step_shares double precision,
+                                  mm jsonb, cap bigint, rival bigint, cash bigint) returns boolean
+  language plpgsql immutable set search_path = '' as $$
+declare p numeric := private.round6(private.mm_buy_share_cents(fair_value, held, k, step_shares, mm));
+begin
+  return (cap is null or p <= cap) and (rival is null or ceil(p) < rival)
+     and (cash is null or private.round6(fair_value * (1 + (mm->>'spread')::double precision / 2)
+                                         * private.mm_geometric(private.mm_q(mm, step_shares), held, k) * 100) <= cash);
+end $$;
+
+-- Doubling first, then halving, so no share far past the answer is priced: the millionth share's price can be too
+-- big for a number (a cash-limited preview of 1,000,000 shares used to fail).
 create function private.mm_buy_count(fair_value double precision, held bigint, step_shares double precision, mm jsonb,
                                      want bigint, cap bigint, rival bigint, cash bigint) returns bigint
   language plpgsql immutable set search_path = '' as $$
-declare lo bigint := 0; hi bigint := want; mid bigint; p double precision;
+declare lo bigint := 1; hi bigint := 2; mid bigint;
 begin
+  if want < 1 or not private.mm_buy_ok(fair_value, held, 1, step_shares, mm, cap, rival, cash) then
+    return 0;
+  end if;
+  while hi <= want and private.mm_buy_ok(fair_value, held, hi, step_shares, mm, cap, rival, cash) loop
+    lo := hi;
+    hi := hi * 2;
+  end loop;
+  hi := least(hi - 1, want);
   while lo < hi loop
     mid := (lo + hi + 1) / 2;
-    p := private.mm_buy_share_cents(fair_value, held, mid, step_shares, mm);
-    if (cap is null or p <= cap) and (rival is null or p < rival)
-       and (cash is null or private.mm_buy_cost_cents(fair_value, held, mid, step_shares, mm) <= cash) then
+    if private.mm_buy_ok(fair_value, held, mid, step_shares, mm, cap, rival, cash) then
       lo := mid;
     else
       hi := mid - 1;
@@ -77,12 +98,12 @@ end $$;
 create function private.mm_sell_count(fair_value double precision, held bigint, step_shares double precision, mm jsonb,
                                       want bigint, floor_cents bigint, rival bigint) returns bigint
   language plpgsql immutable set search_path = '' as $$
-declare lo bigint := 0; hi bigint := least(want, held); mid bigint; p double precision;
+declare lo bigint := 0; hi bigint := least(want, held); mid bigint; p numeric;
 begin
   while lo < hi loop
     mid := (lo + hi + 1) / 2;
-    p := private.mm_sell_share_cents(fair_value, held, mid, step_shares, mm);
-    if (floor_cents is null or p >= floor_cents) and (rival is null or p > rival) then
+    p := private.round6(private.mm_sell_share_cents(fair_value, held, mid, step_shares, mm));
+    if (floor_cents is null or p >= floor_cents) and (rival is null or floor(p) > rival) then
       lo := mid;
     else
       hi := mid - 1;

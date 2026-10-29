@@ -116,15 +116,17 @@ This is the part the roadmap asks Opus at high effort to review before any money
 - **Money is set aside.** A waiting buy order holds back shares × limit price of your cash; a waiting sell holds back
   the shares. You can't promise the same dollar or the same share twice. When a buy fills below its limit, the
   difference is released.
-- **You can't trade with yourself.** An order that would meet your own waiting order is refused: "You have a sell
-  waiting at $41.00. Cancel it first."
+- **You can't trade with yourself.** A limit order that would meet your own waiting order is refused: "You have a
+  sell waiting at $41.00. Cancel it first." A market order stops a cent short of your own order instead, and is
+  refused that way only if that leaves it nothing.
 
 ### Matching
 
 - **Best price first, then oldest first.** An incoming buy takes the cheapest offer; at the same price, the order that
   has waited longest fills first.
 - **Players before the market maker at the same price.** That's how players gradually take over from the market
-  maker, which the public exchange depends on.
+  maker, which the public exchange depends on. "Same" is judged in whole cents, as the buyer pays them: the market
+  maker goes first only when his share is at least a cent better (decided 2026-10-29).
 - **Player to player, the waiting order's price wins.** If you bid $40 and a friend is offering at $38, you pay $38.
 - **Against the market maker, always the market maker's own price.** Its price for each share comes from the Milestone
   1 formula (each share priced on its own, soft cap included). Your limit is only a ceiling (for a buy) or a floor (for
@@ -465,5 +467,31 @@ Choices made while building, for the step 3 review to confirm or change:
 6. Order and trade times are the database clock read after the league's lock, so they follow the lock order.
 7. Shares 1 to 1,000,000 per order; prices $0.01 to $1,000,000.00 a share.
 
-Next: step 3, the matching review (Opus high, fresh conversation; brief in
-`~/.claude/handoffs/sports-stocks-2026-10-29-m2-step3-review.md`).
+**2026-10-29, step 3: the matching review** (Opus high; test project only). 80 tests pass (`python3 tests/run.py`;
+7 new, each written failing first). No money was created or lost in any case tried, the lock covers every write, and
+the sweep's argument (only the best waiting buy, then sale, need trying) holds because nobody can have two of their
+own orders crossing. What it found and fixed:
+
+1. **A cash-limited market preview of a huge order failed** ("bigint out of range" at about 300,000 shares and up):
+   the market maker's share count tried the millionth share's price. It now doubles up from one share, then halves,
+   like `engine/market_maker.py`'s `most_affordable`, so it never prices a share far past the answer.
+2. **The preview's worst price could refuse the share it showed.** Prices are shown at 6 decimals (as in Python), but
+   the guard compared exact prices, so a share at $51.0000003 previewed as $51.00 and then didn't fill at $51.00.
+   Shares are now compared at 6 decimals everywhere.
+3. **A waking buy could pay a friend more than the market maker asked.** When two orders cross after a game (choice
+   1: the older order's price), the market maker was compared with the other order's price, not the price actually
+   paid: a $45 buy paid $45 to a friend while he asked $43.90. He is now compared with the price actually paid.
+4. **The overnight sweep could fill orders after a league's end date**, before `end_leagues` ran. It now fills
+   nothing once the end date has passed.
+5. **A market buy was refused for your own sale waiting far above the market** ("You have a sell waiting at $60.00"
+   when buying at $51). A market order now stops a cent short of your own order; see "Orders".
+6. **The daily self-check (`check_league`) now also catches** a market maker fill that isn't his formula's price, his
+   recorded holdings drifting, and anything awake left crossed (two players' orders, or an order and his price). The
+   tests now sweep, then check, as the robot will. Each fill now records the fair value it was priced at, so a
+   fair-value update landing mid-order can't make the check cry wolf.
+
+Justin's answers: **all 7 choices above kept as built.** One new rule: **players go first at the same price in whole
+cents** (the market maker must be a full cent better), so a friend's $52.00 beats his $51.996 (test 7).
+
+Next: step 4, the robot online (Opus medium, fresh conversation; brief in
+`~/.claude/handoffs/sports-stocks-2026-10-29-m2-step4-robot.md`).

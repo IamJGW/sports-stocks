@@ -89,10 +89,18 @@ end $$;
 --   want: shares. cash: a buy's spending limit, null when its cash is already set aside.
 --   taker: the taker's order id when it is already waiting (the sweep), null for a new order.
 -- Player to player, the price is the older order's (for a new order, always the waiting one's). Against the market
--- maker, his own price, each share on its own, rounded against the player once per piece.
+-- maker, his own price, each share on its own, rounded against the player once per piece; he goes first only when
+-- strictly better than the price the player piece would actually be paid at.
+create function private.player_price(t public.orders, o public.orders, has boolean) returns bigint
+  language sql immutable set search_path = '' as $$
+  select case when not has then null
+              when t.id is not null and (t.placed_at, t.id) < (o.placed_at, o.id) then t.limit_cents
+              else o.limit_cents end;
+$$;
+
 create function private.match(p_market uuid, p_athlete text, p_member uuid, p_side text, p_cap bigint,
                               p_want bigint, p_cash bigint, p_taker bigint, p_now timestamptz) returns jsonb
-  language plpgsql set search_path = '' as $$
+  language plpgsql set search_path = '' set extra_float_digits = 1 as $$
 declare
   a public.athletes;
   v_mm jsonb;
@@ -121,15 +129,15 @@ begin
          and (p_cap is null or limit_cents <= p_cap)
        order by limit_cents, placed_at, id limit 1 for update;
       v_has := found;
+      v_price := private.player_price(t, o, v_has);
       v_n := 0;
       if v_out is null then
-        v_n := private.mm_buy_count(a.fair_value, v_held, a.step_shares, v_mm, v_left, p_cap,
-                                    case when v_has then o.limit_cents end, v_cash);
+        v_n := private.mm_buy_count(a.fair_value, v_held, a.step_shares, v_mm, v_left, p_cap, v_price, v_cash);
       end if;
       if v_n > 0 then
         v_cents := private.mm_buy_cost_cents(a.fair_value, v_held, v_n, a.step_shares, v_mm);
         v_pieces := v_pieces || jsonb_build_object('order_id', null, 'member_id', null, 'shares', v_n,
-          'cents', v_cents, 'held', v_held,
+          'cents', v_cents, 'held', v_held, 'fv', a.fair_value,
           'worst', ceil(private.round6(private.mm_buy_share_cents(a.fair_value, v_held, v_n, a.step_shares, v_mm))));
         v_held := v_held + v_n;
         v_left := v_left - v_n;
@@ -143,15 +151,15 @@ begin
          and (p_cap is null or limit_cents >= p_cap)
        order by limit_cents desc, placed_at, id limit 1 for update;
       v_has := found;
+      v_price := private.player_price(t, o, v_has);
       v_n := 0;
       if v_out is null then
-        v_n := private.mm_sell_count(a.fair_value, v_held, a.step_shares, v_mm, v_left, p_cap,
-                                     case when v_has then o.limit_cents end);
+        v_n := private.mm_sell_count(a.fair_value, v_held, a.step_shares, v_mm, v_left, p_cap, v_price);
       end if;
       if v_n > 0 then
         v_cents := private.mm_sell_proceeds_cents(a.fair_value, v_held, v_n, a.step_shares, v_mm);
         v_pieces := v_pieces || jsonb_build_object('order_id', null, 'member_id', null, 'shares', v_n,
-          'cents', v_cents, 'held', v_held,
+          'cents', v_cents, 'held', v_held, 'fv', a.fair_value,
           'worst', floor(private.round6(private.mm_sell_share_cents(a.fair_value, v_held, v_n, a.step_shares, v_mm))));
         v_held := v_held - v_n;
         v_left := v_left - v_n;
@@ -159,11 +167,6 @@ begin
       end if;
     end if;
     exit when not v_has;
-    if t.id is not null and (t.placed_at, t.id) < (o.placed_at, o.id) then
-      v_price := t.limit_cents;
-    else
-      v_price := o.limit_cents;
-    end if;
     v_n := least(v_left, o.remaining, coalesce(v_cash / v_price, v_left));
     exit when v_n = 0;
     update public.orders set remaining = remaining - v_n,
@@ -179,15 +182,16 @@ begin
   return v_pieces;
 end $$;
 
--- One trade row per piece. A market maker piece records his fair value and the league's holdings before it.
+-- One trade row per piece. A market maker piece records the fair value it was priced at and the league's holdings
+-- before it.
 create function private.record_fills(p_market uuid, p_athlete text, p_side text, p_member uuid, p_order bigint,
                                      p_pieces jsonb, p_now timestamptz) returns void
   language plpgsql set search_path = '' as $$
-declare x record; v_fv double precision;
+declare x record;
 begin
-  select fair_value into v_fv from public.athletes where id = p_athlete;
   for x in select * from jsonb_to_recordset(p_pieces)
-                  as r(order_id bigint, member_id uuid, shares int, cents bigint, held bigint) loop
+                  as r(order_id bigint, member_id uuid, shares int, cents bigint, held bigint,
+                       fv double precision) loop
     insert into public.trades (market_id, athlete_id, at, buyer_id, seller_id, shares, cents, buy_order_id,
                                sell_order_id, mm_fair_value, mm_held_before)
     values (p_market, p_athlete, p_now,
@@ -196,7 +200,7 @@ begin
             x.shares, x.cents,
             case when p_side = 'buy' then p_order else x.order_id end,
             case when p_side = 'buy' then x.order_id else p_order end,
-            case when x.order_id is null then v_fv end, x.held);
+            x.fv, x.held);
   end loop;
 end $$;
 
@@ -261,6 +265,8 @@ declare
   v_status text;
   v_order bigint;
   v_out timestamptz;
+  v_cap bigint;
+  v_self text;
 begin
   perform private.lock_league(p_market);
   v_now := clock_timestamp();
@@ -290,19 +296,26 @@ begin
     raise exception 'A market order needs the price from its preview.';
   end if;
 
-  -- You can't trade with yourself.
+  -- You can't trade with yourself: a limit order that would meet your own waiting order is refused. A market order
+  -- stops a cent short of it instead, and is refused only if that leaves it nothing.
+  v_cap := p_limit_cents;
   if p_side = 'buy' then
     select min(limit_cents) into v_own from public.orders where member_id = me.id and athlete_id = p_athlete
-       and side = 'sell' and status = 'open' and (p_limit_cents is null or limit_cents <= p_limit_cents);
-    if v_own is not null then
-      raise exception 'You have a sell waiting at %. Cancel it first.', private.money(v_own);
+       and side = 'sell' and status = 'open';
+    if v_own is not null and v_own <= coalesce(v_cap, v_own) then
+      v_cap := v_own - 1;
+      v_self := format('You have a sell waiting at %s. Cancel it first.', private.money(v_own));
     end if;
   else
     select max(limit_cents) into v_own from public.orders where member_id = me.id and athlete_id = p_athlete
-       and side = 'buy' and status = 'open' and (p_limit_cents is null or limit_cents >= p_limit_cents);
-    if v_own is not null then
-      raise exception 'You have a buy waiting at %. Cancel it first.', private.money(v_own);
+       and side = 'buy' and status = 'open';
+    if v_own is not null and v_own >= coalesce(v_cap, v_own) then
+      v_cap := v_own + 1;
+      v_self := format('You have a buy waiting at %s. Cancel it first.', private.money(v_own));
     end if;
+  end if;
+  if p_kind = 'limit' and v_self is not null then
+    raise exception '%', v_self;
   end if;
 
   -- Money and shares can't be promised twice.
@@ -323,12 +336,15 @@ begin
     end if;
   end if;
 
-  v_pieces := private.match(p_market, p_athlete, me.id, p_side, p_limit_cents, p_shares, v_cash, null, v_now);
+  v_pieces := private.match(p_market, p_athlete, me.id, p_side, v_cap, p_shares, v_cash, null, v_now);
   select coalesce(sum((x->>'shares')::bigint), 0), coalesce(sum((x->>'cents')::bigint), 0),
          case when p_side = 'buy' then max((x->>'worst')::bigint) else min((x->>'worst')::bigint) end
     into v_filled, v_cents, v_worst from jsonb_array_elements(v_pieces) x;
   v_out := private.mm_out(p_athlete, v_now);
 
+  if v_filled = 0 and v_self is not null then
+    raise exception '%', v_self;
+  end if;
   if p_kind = 'market' and v_filled = 0 and not p_preview then
     raise exception '%', case when v_out is not null
       then format('No %s shares are on offer at that price, and the market maker is out while %s plays.',
@@ -610,14 +626,16 @@ end $$;
 
 -- ---- For the robot (secret key only)
 
--- After the overnight update: sweep every athlete with waiting orders in one league against the new prices.
+-- After the overnight update: sweep every athlete with waiting orders in one league against the new prices. Once the
+-- league's end date has passed nothing fills, even before end_leagues cancels what's left.
 create function public.sweep_league(p_market uuid) returns jsonb
   language plpgsql security definer set search_path = '' as $$
 declare v_now timestamptz; a text; v_fills jsonb := '[]';
 begin
   perform private.lock_league(p_market);
   v_now := clock_timestamp();
-  if (select closed_at from public.markets where id = p_market) is not null then
+  if exists (select 1 from public.markets where id = p_market
+             and (closed_at is not null or private.eastern_day(v_now) > ends_on)) then
     return v_fills;
   end if;
   for a in select distinct athlete_id from public.orders where market_id = p_market and status = 'open'
@@ -644,8 +662,10 @@ begin
 end $$;
 
 -- The books add up: nobody's cash or shares below zero or promised twice, every order's open shares equal its shares
--- minus its fills, the market maker holds exactly what the players hold between them, and no fill broke a price
--- limit. Returns the problems (none: an empty list). The robot runs it daily; the tests run it after every case.
+-- minus its fills, the market maker holds exactly what the players hold between them, each of his fills is his
+-- formula's price for the holdings before it, no fill broke a price limit, and nothing awake is left crossed (two
+-- players' orders, or an order and his price). Returns the problems (none: an empty list). The robot runs it daily
+-- after the sweep; the tests run it after every case.
 create function public.check_league(p_market uuid) returns jsonb
   language sql stable security definer set search_path = '' as $$
   with m as (select * from public.members where market_id = p_market),
@@ -667,6 +687,35 @@ create function public.check_league(p_market uuid) returns jsonb
     select 'market maker holdings', a.athlete_id from a
      where private.held(p_market, a.athlete_id)
            <> (select coalesce(sum(private.shares(m.id, a.athlete_id)), 0) from m)
+    union all
+    select 'market maker holdings before', t.id::text from t
+     where t.mm_held_before is not null
+       and t.mm_held_before <> (select coalesce(sum(case when u.seller_id is null then u.shares else -u.shares end), 0)
+                                  from t u where u.athlete_id = t.athlete_id and u.mm_held_before is not null
+                                   and u.id < t.id)
+    union all
+    select 'market maker price', t.id::text from t join public.athletes x on x.id = t.athlete_id
+      join public.markets k on k.id = p_market
+     where t.mm_fair_value is not null
+       and t.cents <> case when t.seller_id is null
+             then private.mm_buy_cost_cents(t.mm_fair_value, t.mm_held_before, t.shares, x.step_shares, k.mm)
+             else private.mm_sell_proceeds_cents(t.mm_fair_value, t.mm_held_before, t.shares, x.step_shares, k.mm) end
+    union all
+    select 'book crossed', b.id::text || ' ' || s.id::text
+      from o b join o s on s.athlete_id = b.athlete_id and s.side = 'sell' and s.status = 'open'
+                       and s.member_id <> b.member_id and s.limit_cents <= b.limit_cents
+     where b.side = 'buy' and b.status = 'open'
+       and coalesce(least(b.placed_at, s.placed_at) >= private.mm_out(b.athlete_id, now()), true)
+    union all
+    select 'book crossed', o.id::text from o join public.athletes x on x.id = o.athlete_id
+      join public.markets k on k.id = p_market
+     where o.status = 'open' and private.mm_out(o.athlete_id, now()) is null
+       and case when o.side = 'buy'
+             then private.round6(private.mm_buy_share_cents(x.fair_value, private.held(p_market, o.athlete_id), 1,
+                                                            x.step_shares, k.mm)) <= o.limit_cents
+             else private.held(p_market, o.athlete_id) > 0
+                  and private.round6(private.mm_sell_share_cents(x.fair_value, private.held(p_market, o.athlete_id),
+                                                                 1, x.step_shares, k.mm)) >= o.limit_cents end
     union all
     select 'paid above a buy limit', t.id::text from t join o on o.id = t.buy_order_id
      where t.cents > t.shares::bigint * o.limit_cents
