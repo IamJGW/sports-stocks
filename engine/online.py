@@ -102,6 +102,11 @@ class Project:
         for i in range(0, len(rows), PAGE):
             _request("POST", url, self._headers({"Prefer": ",".join(prefer)}), rows[i:i + PAGE])
 
+    def update(self, table, values, **filters):
+        """Change the rows matching filters, e.g. update('games', {'status': 'x'}, id='eq.nfl-2026:401')"""
+        q = urllib.parse.urlencode(filters)
+        _request("PATCH", f"{self.url}/rest/v1/{table}?{q}", self._headers({"Prefer": "return=minimal"}), values)
+
 
 class Management:
     """Raw SQL on a project, through Supabase's management API and the personal access token."""

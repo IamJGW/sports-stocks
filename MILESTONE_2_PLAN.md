@@ -434,6 +434,36 @@ asks for it without showing it and saves it in `~/.config/sports-stocks/`, reada
   Online ids carry the season: `nfl-2026:3117251`.
 - `tests/test_migrations.py`: the same lock-down checks on the SQL files, plus the uploader's rows fitting the tables.
 
-**Not yet run against Supabase.** The SQL has never been executed; the first `python3 tools/db.py test push` will show
-any mistakes. Next: your accounts and keys, then the online half of step 1 (push, safety check, upload, a test that a
-signed-in phone can't write), then step 2.
+**2026-10-29, step 1 finished and step 2 built, on the test project only** (live has nothing yet). 73 tests pass
+(`python3 tests/run.py`; the 25 online ones run against the test project and are skipped on a Mac without its keys).
+
+- Step 1 online: all migrations applied to `sports-stocks-test`, safety check passes, the season copied and read back
+  exactly. `tests/test_online_lockdown.py`: a phone that isn't signed in can't read or write anything; a signed-in
+  phone reads the shared tables but can't insert, change or delete in any table, and sees no league it isn't in;
+  payouts and stat lines refuse changes.
+- `config/online.json`: both projects' addresses and publishable keys (public by design).
+- `db/migrations/003_market_maker.sql`: the market maker's prices in SQL. `tests/test_online_market_maker.py` checks
+  them against `engine/market_maker.py` on 6,000 random blocks, the edges and the save's real trade: equal to the cent.
+- `db/migrations/004_trading.sql`: create, join and change leagues (6-character codes); `place_order` (limit and
+  market, with `p_preview` running the same code and rolling it back); `cancel_order`; matching by the rules above;
+  the sweep after every order; `order_book` (no names, asleep shares marked, the market maker's line, last trade),
+  `my_account`, `leaderboard`. For the robot only: `sweep_league`, `end_leagues` and `check_league` (the daily
+  self-check: no negative or twice-promised cash or shares, fills equal each order's shares minus open shares, the
+  market maker holds exactly what the players hold, no fill past a limit). Phones may call only the nine functions in
+  `db/phone_functions.txt`.
+- `tests/test_online_trading.py`: a test for each rule, through real signed-in test users (tester01-20@example.com,
+  test project only), including the 20-at-once test (exactly 50 fill). `tests/test_online_random.py`: 70 random
+  orders, cancels, fair-value moves, games and sweeps; after every step the books add up and nothing is left crossed.
+
+Choices made while building, for the step 3 review to confirm or change:
+1. Two waiting orders that cross (only possible after sleeping orders wake) trade at the **older** order's price.
+2. Sleeping cutoff: the latest kickoff among his team's started, unprocessed games. A set-aside game keeps the market
+   maker out of that team until it is processed.
+3. A limit buy needs all of shares × limit free when placed, or it is refused (not placed smaller).
+4. A market order that would fill nothing is refused with a reason and leaves no order row.
+5. Your own crossing order blocks a new one even while it sleeps.
+6. Order and trade times are the database clock read after the league's lock, so they follow the lock order.
+7. Shares 1 to 1,000,000 per order; prices $0.01 to $1,000,000.00 a share.
+
+Next: step 3, the matching review (Opus high, fresh conversation; brief in
+`~/.claude/handoffs/sports-stocks-2026-10-29-m2-step3-review.md`).

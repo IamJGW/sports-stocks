@@ -11,7 +11,9 @@ games take the save's latest values. Afterwards it reads everything back and che
 """
 import argparse
 import json
+import math
 import os
+import re
 import sqlite3
 import sys
 
@@ -60,10 +62,15 @@ PLAN = [
 KEYS = {t: c.split(",") for t, c, _ in PLAN}
 
 
+TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d(:\d\d)?Z$")
+
+
 def same(a, b):
     """A value read back equals the one sent (times come back as +00:00 rather than Z)."""
-    if isinstance(a, str) and isinstance(b, str) and a.endswith("Z"):
+    if isinstance(a, str) and isinstance(b, str) and TIME.match(a):
         return L.parse_utc(a) == L.parse_utc(b[:19])
+    if isinstance(a, float) and isinstance(b, (int, float)) and not isinstance(b, bool):
+        return math.isclose(a, b, rel_tol=1e-13, abs_tol=0)  # the web API sends back 15 significant digits
     return a == b
 
 
