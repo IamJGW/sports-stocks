@@ -228,3 +228,12 @@ Milestone 0 is done. Milestone 1's plan is `MILESTONE_1_PLAN.md`.
 Milestone 1 steps 1 to 4 are built (see `MILESTONE_1_PLAN.md`, "Progress"). Next: the screens (step 5) and the
 hand-check workbook (step 6), then Justin plays a real week. Open question from the build: the early-season NFL
 groups pay well above their promise; checking whether that's a pattern needs 2025's weekly box scores.
+
+## Next step (2026-10-28)
+
+Milestone 1 is built and running: the nightly job has paid 107 NFL games through week 7, and week 7's dividends
+matched the hand check (83 lines). Justin trades through week 8 (29 Oct-2 Nov) and answers the week's survey.
+
+Milestone 2, the online league, is planned in `MILESTONE_2_PLAN.md`: trading and the order book inside Supabase, the
+nightly robot on GitHub Actions, about five weeks to a two-house test in early December. It waits on Justin's answers
+to its "Decisions for you" and on his GitHub and Supabase accounts.

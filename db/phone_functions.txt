@@ -1,0 +1,2 @@
+# Database functions a phone (signed in or not) may call. tools/db.py status fails if any other function in the
+# public schema is callable by phones. One name per line; step 2 adds the trading functions here.
