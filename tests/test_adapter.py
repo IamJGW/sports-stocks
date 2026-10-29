@@ -1,6 +1,7 @@
 import gzip
 import json
 import os
+import tempfile
 import unittest
 
 from helpers import ROOT
@@ -30,6 +31,27 @@ class Adapter(unittest.TestCase):
                 if cat["name"] == "receiving":
                     cat["athletes"][0]["stats"][1] = str(int(cat["athletes"][0]["stats"][1]) + 40)
         self.assertTrue(E.parse_game(self.raw)["problems"])
+
+    def test_box_score_without_player_stats_is_not_kept(self):
+        self.assertTrue(E.has_player_stats(self.raw))
+        empty = json.loads(json.dumps(self.raw))     # what ESPN first sent for DAL at PHI, week 7 2026
+        for tm in empty["boxscore"]["players"]:
+            tm["statistics"] = [{"name": n, "athletes": []} for n in ("xfl", "nfl", "college-football", "ufl")]
+        self.assertFalse(E.has_player_stats(empty))
+        with tempfile.TemporaryDirectory() as tmp:
+            cache, get = E.CACHE, E._get
+            E.CACHE = tmp
+            try:
+                E._get = lambda url: empty
+                with self.assertRaises(E.FeedError):
+                    E.game_summary("1")
+                self.assertFalse(os.listdir(tmp))           # nothing saved
+                E._write_gz(os.path.join(tmp, "game_1.json.gz"), empty)
+                E._get = lambda url: self.raw
+                self.assertTrue(E.has_player_stats(E.game_summary("1")))       # an empty saved copy is fetched again
+                self.assertTrue(E.has_player_stats(E._read_gz(os.path.join(tmp, "game_1.json.gz"))))
+            finally:
+                E.CACHE, E._get = cache, get
 
     def test_two_point_conversions(self):
         texts = [("Jayden Daniels 26 Yd Rush (Jayden Daniels Pass to Terry McLaurin for Two-Point Conversion)",

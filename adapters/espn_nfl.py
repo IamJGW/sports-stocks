@@ -90,17 +90,32 @@ def parse_schedule(raw, week):
 
 # ---- Box scores
 
+def has_player_stats(raw):
+    """True when both teams have passing, rushing and receiving sections. Right after a game ESPN sometimes marks it
+    final while the player stats are still empty (DAL at PHI, week 7 2026); such a copy must not be kept for good."""
+    teams = raw.get("boxscore", {}).get("players", [])
+    return len(teams) == 2 and all({"passing", "rushing", "receiving"} <= {s.get("name") for s in t.get("statistics", [])}
+                                   for t in teams)
+
+
 def game_summary(game_id, offline=False):
-    """The raw box score of a finished game, downloaded once and then read from the cache."""
+    """The raw box score of a finished game, downloaded once and then read from the cache.
+
+    A saved copy without player stats is downloaded again (unless offline), so an early empty copy can't block the
+    nightly job for good."""
     path = _cache_path(f"game_{game_id}.json.gz")
     if os.path.exists(path):
-        return _read_gz(path)
+        raw = _read_gz(path)
+        if offline or has_player_stats(raw):
+            return raw
     if offline:
         raise FeedError(f"No saved box score for game {game_id} and offline mode is on.")
     raw = _get(f"{SITE}/summary?event={game_id}")
     status = raw.get("header", {}).get("competitions", [{}])[0].get("status", {}).get("type", {})
     if status.get("name") != "STATUS_FINAL":
         raise FeedError(f"Game {game_id} is not final yet ({status.get('name')}).")
+    if not has_player_stats(raw):
+        raise FeedError(f"Game {game_id} is final but ESPN has no player stats for it yet; trying again next run.")
     _write_gz(path, raw)
     return raw
 
