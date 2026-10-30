@@ -47,32 +47,42 @@ def days_to_process(conn, today):
 
 # ---- One day
 
-def fetch_day(conn, day, feed, offline=False):
-    """Download and check every game of the day. Returns parsed games, or raises NotReady with every problem found."""
+def fetch_day(conn, day, feed, offline=False, set_aside=()):
+    """Download and check every game of the day. Returns parsed games, or raises NotReady with every problem found.
+    A game in set_aside (set aside by hand, online only) whose box score is still bad is left out instead."""
     games = conn.execute("SELECT * FROM games WHERE day = ? AND processed_at IS NULL AND status NOT IN (?, ?)",
                          (day, *SKIPPED)).fetchall()
     parsed, problems = [], []
     listed = {r["id"] for r in conn.execute("SELECT id FROM athletes")}
     for g in games:
-        if g["status"] != "STATUS_FINAL":
-            problems.append(f"{g['away']} at {g['home']} isn't final yet ({g['status']}).")
+        found, p = check_game(g, feed, listed, offline)
+        if found and g["id"] in set_aside:
             continue
-        try:
-            p = feed.parse_game(feed.game_summary(g["id"], offline=offline))
-        except feed.FeedError as e:
-            problems.append(str(e))
-            continue
-        if not p["final"]:
-            problems.append(f"{g['away']} at {g['home']}: box score isn't marked final.")
-        if sorted(p["teams"]) != sorted([g["home"], g["away"]]):
-            problems.append(f"Game {g['id']}: box score is for {p['teams']}, schedule says {g['away']} at {g['home']}.")
-        problems += [f"{g['away']} at {g['home']}: {x}" for x in p["problems"]]
-        if not any(aid in listed for aid in p["lines"]):
-            problems.append(f"{g['away']} at {g['home']}: no listed athlete appears in the box score.")
-        parsed.append((g, p))
+        problems += found
+        if p is not None:
+            parsed.append((g, p))
     if problems:
         raise NotReady("\n".join(problems))
     return parsed
+
+
+def check_game(g, feed, listed, offline):
+    """One game's problems (none: an empty list) and its parsed box score (None if there isn't one)."""
+    if g["status"] != "STATUS_FINAL":
+        return [f"{g['away']} at {g['home']} isn't final yet ({g['status']})."], None
+    try:
+        p = feed.parse_game(feed.game_summary(g["id"], offline=offline))
+    except feed.FeedError as e:
+        return [str(e)], None
+    problems = []
+    if not p["final"]:
+        problems.append(f"{g['away']} at {g['home']}: box score isn't marked final.")
+    if sorted(p["teams"]) != sorted([g["home"], g["away"]]):
+        problems.append(f"Game {g['id']}: box score is for {p['teams']}, schedule says {g['away']} at {g['home']}.")
+    problems += [f"{g['away']} at {g['home']}: {x}" for x in p["problems"]]
+    if not any(aid in listed for aid in p["lines"]):
+        problems.append(f"{g['away']} at {g['home']}: no listed athlete appears in the box score.")
+    return problems, p
 
 
 def process_day(conn, day, parsed, now):

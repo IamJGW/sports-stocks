@@ -10,6 +10,7 @@ Options:
 If a game isn't final or its box score doesn't add up, the job stops, pays nothing for that day, and says why.
 """
 import argparse
+import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -18,7 +19,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 from adapters import espn_nfl as feed  # noqa: E402
 from engine import ledger as L, nightly as N, pricing  # noqa: E402
-from tools import hand_check  # noqa: E402
+from engine import robot  # noqa: E402
+from engine.online import OnlineError, Project  # noqa: E402
 
 DEFAULT_SAVE = os.path.join(ROOT, "save", "game.sqlite")
 
@@ -50,7 +52,14 @@ def main():
     ap.add_argument("--offline", action="store_true")
     ap.add_argument("--save", default=DEFAULT_SAVE)
     ap.add_argument("--quiet", action="store_true", help="print only a one-line summary per day")
+    ap.add_argument("--online", action="store_true")
+    ap.add_argument("--target", choices=["live", "test"], default="live")
+    ap.add_argument("--season", help="online season id (default: config/online.json)")
+    ap.add_argument("--set-aside", metavar="GAME_ID")
+    ap.add_argument("--reason")
     args = ap.parse_args()
+    if args.online:
+        sys.exit(main_online(args))
     if not os.path.exists(args.save):
         sys.exit("No game yet. Start one with: python3 tools/new_game.py")
     now = as_of(args.as_of) if args.as_of else datetime.now(timezone.utc)
@@ -91,8 +100,27 @@ def main():
     write_hand_checks(conn, weeks, args.save)
 
 
+def main_online(args):
+    with open(os.path.join(ROOT, "config", "online.json")) as f:
+        season = args.season or json.load(f)["season"]
+    try:
+        project = Project(args.target)
+        if args.set_aside:
+            game = args.set_aside if ":" in args.set_aside else f"{season}:{args.set_aside}"
+            project.rpc("robot_set_aside", p_game=game, p_reason=args.reason)
+            print(f"Set aside {game}: the day's other games will pay on the next run.")
+            return 0
+    except OnlineError as e:
+        print(f"Supabase said: {e}")
+        return 1
+    now = as_of(args.as_of) if args.as_of else datetime.now(timezone.utc)
+    print(f"Online robot: {args.target} project, season {season}, as of {now:%Y-%m-%d %H:%M} UTC.")
+    return robot.run(project, season, feed, now, offline=args.offline, quiet=args.quiet)
+
+
 def write_hand_checks(conn, weeks, save):
     """One hand-check workbook per week touched by this run (written once, after the last day, to stay quick)."""
+    from tools import hand_check  # needs openpyxl, which the online robot (GitHub) doesn't have
     out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(save))), "checks")
     for week in weeks:
         try:

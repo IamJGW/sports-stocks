@@ -370,8 +370,10 @@ asks for it without showing it and saves it in `~/.config/sports-stocks/`, reada
 
 **Before step 4:**
 
-5. **GitHub secrets:** in the repository, Settings, Secrets and variables, Actions, add `SUPABASE_URL` and
-   `SUPABASE_SECRET_KEY` for the live project (paste them there yourself).
+5. **GitHub secrets:** in the repository, Settings, Secrets and variables, Actions, "New repository secret". First
+   `SUPABASE_TEST_SECRET_KEY` (the test project's secret key, for the three test nights), later `SUPABASE_SECRET_KEY`
+   (the live one). Paste them there yourself. The projects' addresses aren't needed: they're public, in
+   `config/online.json`.
 6. **Failure emails:** github.com/settings/notifications, Actions: make sure email is on for failed workflows.
 
 **Before step 5:**
@@ -495,3 +497,43 @@ cents** (the market maker must be a full cent better), so a friend's $52.00 beat
 
 Next: step 4, the robot online (Opus medium, fresh conversation; brief in
 `~/.claude/handoffs/sports-stocks-2026-10-29-m2-step4-robot.md`).
+
+**2026-10-29, step 4: the robot online, built and tested** (Opus medium; test project only, nothing on live).
+
+- `db/migrations/005_robot.sql`, functions for the secret key only: `robot_season` (the season's shared rows with
+  every number exact: the web API sends doubles back with only 15 digits, which would drift from the Mac's save),
+  `robot_sync_games` (the schedule), `robot_holders` (each league's holdings at a day's record time),
+  `robot_day` (one day's whole update in one transaction, in the plan's order: stat lines and payouts; dividends,
+  after recounting the holdings itself, so every holder is paid, nobody else, the right shares, and cents within
+  half a cent; fair values, groups, re-checks, games processed; every open league swept; a report per league with
+  its dividends, net worths, busiest stocks and overnight fills; a day already in is skipped),
+  `robot_set_aside` and `robot_finish` (the status row the banner reads: last run, last good run, the day it's
+  waiting on and why).
+- `engine/robot.py` and `tools/nightly.py --online [--target test]`: copies the season into an in-memory save and
+  runs the Milestone 1 code on it a day at a time (the copy of nfl-2026 equals the Mac's save exactly), works out
+  dividends with `nightly.dividend_cents`, sends each day to `robot_day`, reads the dividends and payouts back, then
+  `end_leagues`, `check_league` in every league of the season, and the status row. A stop exits with an error.
+  `--set-aside GAME_ID --reason "..."` lets a day's other games pay.
+- Locks: `robot_day` takes a season lock (two robots take turns), updates athletes (a "no key update" row lock,
+  which doesn't block the key-share locks phones take when inserting orders and trades), then league locks to sweep.
+  Phones never lock athletes, so no deadlock.
+- `tests/test_online_robot.py` (3 tests, a fake feed on a pretend season `zz-robot`): a pretend day (midnight
+  holders paid, later buyers not; an order placed during a game fills overnight and is in the report; a league past
+  its end isn't paid and is closed; status row; running twice changes nothing); the database refusing wrong shares,
+  a missing or extra holder, or a cent too many; a bad box score stops the run and the status row says why, and
+  setting it aside lets the run finish clean.
+- `.github/workflows/nightly.yml`: 4:30, 6:30, 9:30 and 12:30 Eastern (standard time), against the **test** project.
+- `engine/nightly.fetch_day` takes the set-aside games (offline behaviour unchanged); `tools/nightly.py` imports the
+  hand check only offline (openpyxl isn't on GitHub's machine).
+
+Not done in step 4: the hand check reading from the database (the online books have player-to-player trades, which
+the Milestone 1 workbook doesn't show; the database's recount and the read-back cover dividends meanwhile). The
+weekly stat-correction note stays offline only. The banner itself is step 5: show it when a day before today still
+has an unprocessed game after 10 a.m. Eastern, worded from `robot_status.stop_reason`.
+
+Justin added `SUPABASE_TEST_SECRET_KEY` and confirmed failure emails arrive (items 5-6, test half; the live
+secret waits for the switch). Pushed 29 Oct.
+
+Next: three clean nights on the test project (check each morning
+that its fair values match the Mac's save), then Justin's OK to switch off the Mac's 4:00 job and move to live.
+

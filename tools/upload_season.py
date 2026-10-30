@@ -3,6 +3,8 @@
   python3 tools/upload_season.py test           copy to the test project
   python3 tools/upload_season.py live           copy to the real one
   --save PATH                                   a different save (default save/game.sqlite)
+  --check                                       upload nothing: only compare the project with the save (while the
+                                                online robot and the Mac both run, they must agree exactly)
 
 Copies only what every league shares: the season and its levers, athletes, groups and their re-checks, the schedule,
 stat lines, per-share payouts and daily fair values. Justin's own solo trades and dividends stay on the Mac.
@@ -74,7 +76,8 @@ def same(a, b):
     return a == b
 
 
-def check(project, sid, rows):
+def check(project, sid, rows, skip=()):
+    """Every row sent is stored exactly, and nothing else. skip: columns not to compare."""
     problems = []
     for table, sent in rows.items():
         filt = {"id": f"eq.{sid}"} if table == "seasons" else (
@@ -90,7 +93,7 @@ def check(project, sid, rows):
                 problems.append(f"{table}: missing {[s[k] for k in KEYS[table]]}")
                 continue
             for col, v in s.items():
-                if col != "economy" and not same(v, g[col]):
+                if col != "economy" and col not in skip and not same(v, g[col]):
                     problems.append(f"{table} {[s[k] for k in KEYS[table]]}: {col} sent {v!r}, stored {g[col]!r}")
         if len(got) != len(sent):
             problems.append(f"{table}: sent {len(sent)} rows, the project has {len(got)}")
@@ -101,12 +104,20 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("target", choices=["test", "live"])
     ap.add_argument("--save", default=DEFAULT_SAVE)
+    ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
     conn = sqlite3.connect(args.save)
     conn.row_factory = sqlite3.Row
     sid, rows = season_rows(conn)
     try:
         project = Project(args.target)
+        if args.check:  # each side stamps its own times, and syncs game status at its own hour
+            problems = check(project, sid, rows, skip=("processed_at", "paid_at", "status"))
+            print(f"{sid}: the {args.target} project and the save " + (
+                "match exactly." if not problems else f"differ in {len(problems)} places. First few:"))
+            for p in problems[:10]:
+                print("  " + p)
+            sys.exit(1 if problems else 0)
         for table, conflict, existing in PLAN:
             project.insert(table, rows[table], on_conflict=conflict, existing=existing)
             print(f"{table}: {len(rows[table])} rows")

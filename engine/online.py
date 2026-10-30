@@ -37,6 +37,16 @@ def _read_env(name):
     return out
 
 
+def _public_url(target):
+    """The project's address from config/online.json (public), so GitHub needs only the secret key."""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "online.json")
+    try:
+        with open(path) as f:
+            return json.load(f).get(target, {}).get("url")
+    except (OSError, ValueError):
+        return None
+
+
 def _request(method, url, headers, body=None):
     data = None if body is None else json.dumps(body).encode()
     req = urllib.request.Request(url, data=data, method=method,
@@ -62,7 +72,7 @@ class Project:
         self.target = target
         env = _read_env(target)
         prefix = "" if target == "live" else f"{target.upper()}_"
-        self.url = os.environ.get(f"{prefix}SUPABASE_URL") or env.get("SUPABASE_URL")
+        self.url = os.environ.get(f"{prefix}SUPABASE_URL") or env.get("SUPABASE_URL") or _public_url(target)
         self.key = os.environ.get(f"{prefix}SUPABASE_SECRET_KEY") or env.get("SUPABASE_SECRET_KEY")
         if not (self.url and self.key):
             raise OnlineError(f"No keys for the '{target}' project. Run: python3 tools/set_key.py {target}")

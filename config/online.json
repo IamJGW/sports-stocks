@@ -1,5 +1,5 @@
 {
-  "_note": "The two Supabase projects' addresses and publishable keys. These are meant to be public (the web page carries them); the secret keys never go here.",
+  "_note": "The two Supabase projects' addresses and publishable keys. These are meant to be public (the web page carries them); the secret keys never go here. 'season' is the one the nightly robot runs.",
   "live": {
     "url": "https://snhxzlesvfaovchrmgse.supabase.co",
     "publishable_key": "sb_publishable_VuYwnEbwPvbafoawKIMCPw_oefQDekw"
@@ -7,5 +7,6 @@
   "test": {
     "url": "https://kxoeilcofkauqbwpoans.supabase.co",
     "publishable_key": "sb_publishable_atbMMk8j-_JXybEuPjay4Q_GCX1IBk1"
-  }
+  },
+  "season": "nfl-2026"
 }
