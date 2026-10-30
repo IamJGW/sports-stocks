@@ -9,15 +9,19 @@
 </head>
 <body>
 <header>
-  <div class="brand">Sports Stocks <span id="season"></span></div>
+  <div class="brand">Sports Stocks <a id="league" href="#/leagues"></a> <span id="season"></span></div>
   <nav>
     <a href="#/market" data-tab="market">Market</a>
     <a href="#/portfolio" data-tab="portfolio">Portfolio</a>
+    <a href="#/league" data-tab="league">League</a>
     <a href="#/report" data-tab="report">Report</a>
     <a href="#/rules" data-tab="rules">How it works</a>
   </nav>
 </header>
+<div id="banner"></div>
 <main id="view"></main>
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -537,3 +537,20 @@ secret waits for the switch). Pushed 29 Oct.
 Next: three clean nights on the test project (check each morning
 that its fair values match the Mac's save), then Justin's OK to switch off the Mac's 4:00 job and move to live.
 
+
+**2026-10-29, step 5: the screens, built and checked on the test project** (Sonnet medium; test project only).
+
+- `web/app.js` rewritten to talk to Supabase through `web/vendor/supabase.js` (supabase-js 2.45.4 from jsDelivr, 111 KB,
+  Justin's OK). `web/config.js` holds the test project's address and publishable key; step 6 switches it to live. The
+  old Mac-server screens are kept as `web/app_offline.js`.
+- Screens: email sign-in with a code (Gmail SMTP set up on the test project, code length 6), leagues (create, join by
+  code or `?join=CODE`, dates, new code, share link, sign out), market, athlete (book, market/limit order box with the
+  preview, open orders with Cancel, recent trades, 5-second book refresh), portfolio, league leaderboard and each player's
+  holdings, the latest morning report, and the late-update banner.
+- Checked in the browser pane against the test project: sign-in, create league, refused trading before the start date,
+  market buy (preview $596.88 = fill), limit sell waiting in the book, cancel, portfolio, leaderboard, player page.
+  Not yet seen: a real report with overnight fills, and the banner showing (no day is late right now).
+- Left out on purpose: the market list shows fair values only (buy and sell prices are on each athlete's screen; a list
+  of them would need a new phone function, so Opus and a migration). Other players' holdings show shares, not worth.
+- `.claude/launch.json` has `sports-stocks-web` (static server on port 8661) for previewing `web/`.
+- Still to do before live: repeat the Supabase SMTP and email-template setup on the live project (items 7-8).
