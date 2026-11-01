@@ -45,6 +45,11 @@ class Migrations(unittest.TestCase):
         self.assertIn("alter default privileges in schema public revoke execute on functions from public, anon, "
                       "authenticated;", SQL)
 
+    def test_market_list_is_for_phones(self):
+        allowed = {line.split("#")[0].strip() for line in open(os.path.join(ROOT, "db", "phone_functions.txt"))}
+        self.assertIn("market_list", allowed)
+        self.assertRegex(SQL, r"grant execute on function public\.market_list\(uuid\) to authenticated;")
+
     def test_money_rows_are_final(self):
         for t in ("trades", "dividends", "payouts", "stat_lines"):
             self.assertRegex(SQL, rf"create trigger \w+ before update or delete on public\.{t}\s+for each row "

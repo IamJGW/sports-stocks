@@ -131,3 +131,13 @@ class Management:
         """Run SQL; returns the last statement's rows as a list of dicts."""
         return _request("POST", f"{MANAGEMENT}/projects/{self.ref}/database/query",
                         {"Authorization": f"Bearer {self.token}"}, {"query": query})[1]
+
+    def auth_config(self):
+        """The project's sign-in settings, as a dict. Holds secrets: never print it whole."""
+        return _request("GET", f"{MANAGEMENT}/projects/{self.ref}/config/auth",
+                        {"Authorization": f"Bearer {self.token}"})[1]
+
+    def update_auth_config(self, fields):
+        """Change only the sign-in settings named in fields."""
+        return _request("PATCH", f"{MANAGEMENT}/projects/{self.ref}/config/auth",
+                        {"Authorization": f"Bearer {self.token}"}, fields)[1]

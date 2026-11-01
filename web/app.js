@@ -15,6 +15,7 @@ const rpc = async (fn, args) => { const { data, error } = await sb.rpc(fn, args)
 const q = async req => { const { data, error } = await req; if (error) throw new Error(error.message); return data; };
 const fail = e => `<div class="msg">${esc(e.message)}</div>`;
 const day = iso => new Date(iso + (iso.length === 10 ? "T12:00:00" : "")).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+const easternToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());   // the database's day
 
 let athletes = null;
 async function loadAthletes() {
@@ -50,14 +51,14 @@ function signin() {
     if (error) { $("#out").innerHTML = fail(error); $("#send").disabled = false; return; }
     view.innerHTML = `<div class="card"><h2 style="margin-top:0">Check your email</h2>
       <p class="dim small">We sent a code to ${esc(email)}.</p>
-      <input type="text" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Code from the email">
+      <input type="text" id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6-digit code from the email">
       <button class="go" id="ok">Sign in</button><button class="link" id="back">Use a different email</button><div id="out"></div></div>`;
     $("#back").onclick = signin;
     $("#ok").onclick = async () => {
       $("#ok").disabled = true;
-      const { error } = await sb.auth.verifyOtp({ email, token: $("#code").value.trim(), type: "email" });
-      if (error) { $("#out").innerHTML = fail(error); $("#ok").disabled = false; return; }
-      location.hash = "#/market"; start();
+      const { data, error } = await sb.auth.verifyOtp({ email, token: $("#code").value.replace(/\D/g, ""), type: "email" });
+      if (error) { $("#out").innerHTML = fail({ message: "That code didn't work. Check the numbers, or go back and send a new one." }); $("#ok").disabled = false; return; }
+      user = data.user; location.hash = "#/market"; start();
     };
   };
 }
@@ -67,7 +68,7 @@ async function leagues() {
   const my = ++token;
   const mine = await loadLeague(); if (my !== token) return;
   const joinCode = new URLSearchParams(location.search).get("join") || "";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = easternToday();
   view.innerHTML = `
     <h2>Your leagues</h2>
     ${mine.map(m => `<div class="card"><b>${esc(m.name)}</b> ${league && m.id === league.id ? '<span class="dim small">(showing)</span>' : ""}
@@ -109,9 +110,12 @@ async function leagues() {
 async function market() {
   const my = ++token;
   await loadLeague(); if (!league) { view.innerHTML = needLeague(); return; }
-  const [list, acct] = await Promise.all([loadAthletes(), rpc("my_account", { p_market: league.id })]);
+  const [list, acct, rows] = await Promise.all([loadAthletes(), rpc("my_account", { p_market: league.id }), rpc("market_list", { p_market: league.id })]);
   if (my !== token) return;
   const mine = Object.fromEntries(acct.holdings.map(h => [h.athlete_id, h.shares]));
+  const quote = Object.fromEntries(rows.map(r => [r.athlete_id, r]));
+  const price = c => c == null ? "none" : cents(c);
+  const quoted = a => { const r = quote[a.id]; return r ? `<span class="sub">Bid ${price(r.best_bid_cents)} · Offer ${price(r.best_ask_cents)} · Last ${price(r.last_cents)}${r.mm_out ? " · market maker out" : ""}</span>` : ""; };
   const st = market.state ||= { pos: "All", q: "" };
   view.innerHTML = `
     <div class="bar"><input type="search" id="q" placeholder="Search name, team or ticker" value="${esc(st.q)}"></div>
@@ -123,7 +127,7 @@ async function market() {
       (!s || (a.name + " " + a.team + " " + a.ticker).toLowerCase().includes(s))).sort((a, b) => b.fair_value - a.fair_value).map(a => `
       <a class="row" href="#/athlete/${a.ticker}"><span class="t">${esc(a.name)} <span class="dim small">${a.ticker}</span></span>
         <span class="num">${money(a.fair_value)}</span><span></span>
-        <span class="sub">${a.team} · ${a.pos} · fair value${mine[a.id] ? ` · <b>you hold ${mine[a.id]}</b>` : ""}</span></a>`).join("") || `<p class="dim">No athletes match.</p>`;
+        <span class="sub">${a.team} · ${a.pos} · fair value${mine[a.id] ? ` · <b>you hold ${mine[a.id]}</b>` : ""}</span>${quoted(a)}</a>`).join("") || `<p class="dim">No athletes match.</p>`;
   };
   $("#q").oninput = e => { st.q = e.target.value; draw(); };
   $("#pos").onclick = e => { const p = e.target.dataset.p; if (!p) return; st.pos = p; [...$("#pos").children].forEach(b => b.classList.toggle("on", b.dataset.p === p)); draw(); };
@@ -166,6 +170,7 @@ async function athlete(ticker) {
   };
   const loadTrades = async () => {
     const ts = await q(sb.from("trades").select("at,shares,cents,buyer_id,seller_id").eq("market_id", league.id).eq("athlete_id", a.id).order("at", { ascending: false }).limit(8)); if (my !== token) return;
+    if (ts.some(t => [t.buyer_id, t.seller_id].some(id => id && !names[id]))) { await loadLeague(); if (my !== token) return; }   // someone joined since
     const nm = id => id ? esc(names[id]?.display_name || "?") : "Market maker";
     $("#trades").innerHTML = ts.map(t => `<div class="small">${new Date(t.at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}: ${nm(t.buyer_id)} bought ${t.shares} from ${nm(t.seller_id)} for ${cents(t.cents)}</div>`).join("") || `<span class="dim">None yet.</span>`;
   };
@@ -209,7 +214,7 @@ async function athlete(ticker) {
   };
   $("#mine").onclick = async e => { const c = e.target.dataset.c; if (!c) return; try { await rpc("cancel_order", { p_order: +c }); refreshAll(); } catch (err) { out.innerHTML = fail(err); } };
   await refreshAll();
-  pollTimer = setInterval(() => { if (!document.hidden && my === token) loadBook().catch(() => {}); }, 5000);
+  pollTimer = setInterval(() => { if (!document.hidden && my === token) Promise.all([loadBook(), loadMine(), loadTrades()]).catch(() => {}); }, 5000);
 }
 
 // ---- Portfolio
@@ -291,7 +296,7 @@ async function rules(section) {
 async function banner() {
   try {
     const f = (o) => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", ...o });
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+    const today = easternToday();
     const hour = +f({ hour: "numeric", hour12: false }).format(new Date()) % 24;
     const [late, st] = await Promise.all([
       q(sb.from("games").select("id,status").eq("season_id", SS.season).lt("day", today).is("processed_at", null)),

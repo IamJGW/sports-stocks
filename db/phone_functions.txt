@@ -9,3 +9,4 @@ new_join_code
 order_book
 my_account
 leaderboard
+market_list

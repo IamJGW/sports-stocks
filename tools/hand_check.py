@@ -6,6 +6,10 @@ work out the dividend per share and your payout, and compare them with what the 
 the game's answers; they only compare against them, so a "match" means two separate calculations agree.
 
 Called by tools/nightly.py after each day it processes. Options: --save PATH, --out FOLDER, --no-recalc.
+
+For a player in an online league: python3 tools/hand_check.py --online --target test --league CODE --player "Name"
+It reads that player's trades and dividends from the database, so player-to-player trades count, and writes
+checks/online-CODE-Name/. The stat lines come from the database too: they are what the robot paid on.
 """
 import argparse
 import json
@@ -122,7 +126,7 @@ def write_week(conn, week, out_dir):
         r = first + i
         raw = json.loads(ln["stats"])
         vals = [f"{ln['away']} at {ln['home']}", ln["day"], ln["ticker"], ln["name"], ln["playoff"],
-                serial(ln["record_time"])] + [raw[k] for k in stats]
+                serial(ln["record_time"])] + [raw.get(k, 0) for k in stats]
         for j, v in enumerate(vals, 1):
             c = ck.cell(r, j, v)
             c.font = BLUE if j >= 5 else BLACK
@@ -192,13 +196,66 @@ def results(path):
     return ck["C2"].value, ck["C3"].value
 
 
+def online_save(project, season, market, member):
+    """One league player's money in an in-memory save, in the Milestone 1 shape write_week reads."""
+    from engine import robot
+    conn, _ = robot.mirror(project, season)
+    espn = lambda online_id: online_id.split(":", 1)[1]  # noqa: E731
+    conn.execute("BEGIN")
+    for p in project.select("payouts", game_id=f"like.{season}:*"):
+        conn.execute("INSERT INTO payouts VALUES (?,?,?,?,?,?,?)",
+                     (espn(p["game_id"]), espn(p["athlete_id"]), p["points"], p["boost"], p["per_share"],
+                      L.utc_text(L.parse_utc(p["record_time"][:19])), L.utc_text(L.parse_utc(p["paid_at"][:19]))))
+    for d in project.select("dividends", market_id=f"eq.{market}", member_id=f"eq.{member}"):
+        conn.execute("INSERT INTO dividends VALUES (?,?,?,?,?)",
+                     (espn(d["game_id"]), espn(d["athlete_id"]), api.PLAYER, d["shares"], d["cents"]))
+    rows = project.select("trades", market_id=f"eq.{market}", order="at",
+                          **{"or": f"(buyer_id.eq.{member},seller_id.eq.{member})"})
+    for t in rows:
+        sign = 1 if t["buyer_id"] == member else -1
+        conn.execute("INSERT INTO trades (at, player, athlete_id, shares, cents, fair_value, market_held_before) "
+                     "VALUES (?,?,?,?,?,0,0)", (L.utc_text(L.parse_utc(t["at"][:19])), api.PLAYER, espn(t["athlete_id"]),
+                                                sign * t["shares"], sign * t["cents"]))
+    conn.execute("COMMIT")
+    return conn
+
+
+def online_main(args):
+    from engine.online import Project
+    p = Project(args.target)
+    league = p.select("markets", join_code=f"eq.{args.league}")
+    if not league:
+        sys.exit(f"No league with code {args.league} on {args.target}.")
+    member = [m for m in p.select("members", market_id=f"eq.{league[0]['id']}")
+              if m["display_name"].lower() == args.player.lower()]
+    if not member:
+        sys.exit(f"Nobody called {args.player} in that league.")
+    conn = online_save(p, league[0]["seasons"][0], league[0]["id"], member[0]["id"])
+    week = args.week or latest_week(conn)
+    out = os.path.join(args.out, f"online-{args.league}-{member[0]['display_name'].replace(' ', '_')}")
+    path = write_week(conn, week, out) if week else None
+    if not path:
+        sys.exit("No paid games for that week yet.")
+    if not args.no_recalc and recalculate(path):
+        n, bad = results(path)
+        print(f"{path}: {n} lines, {bad} mismatches")
+    else:
+        print(path)
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--online", action="store_true")
+    ap.add_argument("--target", choices=["test", "live"], default="test")
+    ap.add_argument("--league", help="the league's join code, with --online")
+    ap.add_argument("--player", help="a display name in that league, with --online")
     ap.add_argument("--week", type=int)
     ap.add_argument("--save", default=DEFAULT_SAVE)
     ap.add_argument("--out", default=os.path.join(ROOT, "checks"))
     ap.add_argument("--no-recalc", action="store_true")
     args = ap.parse_args()
+    if args.online:
+        return online_main(args)
     conn = L.connect(args.save)
     week = args.week or latest_week(conn)
     path = write_week(conn, week, args.out) if week else None

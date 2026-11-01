@@ -4,7 +4,7 @@
 .rules h1 { font-size: 22px; margin: 8px 0 2px; }
 .rules .sub { color: var(--dim); margin: 0 0 12px; font-size: 14px; }
 .rules > nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; position: static; }
-.rules > nav a { flex: none; padding: 5px 11px; border: 1px solid var(--line); border-radius: 99px; background: var(--card);
+.rules > nav a { flex: none; padding: 7px 11px; border: 1px solid var(--line); border-radius: 99px; background: var(--card);
   color: var(--ink); font-size: 14px; text-decoration: none; }
 .rules section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 14px 4px;
   margin: 10px 0; scroll-margin-top: 120px; line-height: 1.55; }
@@ -21,9 +21,9 @@
 .rules .note { color: var(--dim); font-size: 14px; }
 
 /* Little "?" links on the other screens that open the matching part of How it works. */
-a.help { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 4px;
-  border: 1px solid var(--line); border-radius: 50%; font-size: 12px; font-weight: 600; line-height: 1;
-  color: var(--accent); text-decoration: none; vertical-align: 1px; }
+a.help { display: inline-flex; align-items: center; justify-content: center; position: relative; width: 32px; height: 32px;
+  margin: -7px -3px; font-size: 12px; font-weight: 600; line-height: 1; color: var(--accent); text-decoration: none; }
+a.help::before { content: ""; position: absolute; inset: 7px; border: 1px solid var(--line); border-radius: 50%; }
 .helpline { font-size: 13px; margin-top: 8px; }
 .helpline a { color: var(--accent); }
 

@@ -6,6 +6,7 @@ Fixtures, made once and reused:
   - test users tester01..tester24@example.com, made through the admin API with a fresh random password each run.
     Their sign-ins are cached in ~/.config/sports-stocks/test_sessions.json so a run doesn't hit the sign-in limit.
 """
+import fcntl
 import json
 import os
 import secrets
@@ -26,7 +27,18 @@ TEAMS = ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF"]
 MM = {"spread": 0.04, "lean_per_step": 0.01, "dollars_per_step": 5000}
 SESSIONS = os.path.join(online.CONFIG_DIR, "test_sessions.json")
 
-_project = _mgmt = None
+LOCK = os.path.join(online.CONFIG_DIR, "test_run.lock")
+
+_project = _mgmt = _lock = None
+
+
+def take_turn():
+    """One test run at a time on this Mac: the pretend robot days close every league ending before them, and
+    reset_season moves the shared pretend season, so two runs at once fail each other in ways that look like bugs.
+    Held until this run exits."""
+    global _lock
+    _lock = open(LOCK, "w")
+    fcntl.flock(_lock, fcntl.LOCK_EX)
 
 
 def project():
@@ -40,6 +52,7 @@ def project():
             raise unittest.SkipTest(str(e))
         if _project.ref != urllib.parse.urlparse(PUBLIC["test"]["url"]).hostname.split(".")[0]:
             raise unittest.SkipTest("The test keys don't belong to the test project in config/online.json.")
+        take_turn()
     return _project, _mgmt
 
 

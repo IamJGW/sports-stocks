@@ -6,14 +6,18 @@ payouts are final. A pretend day: who held at midnight is paid and later buyers 
 game fills overnight and is in the morning report, a league past its end date stops being paid and is closed, the
 self-check passes, the status row is written, and running again changes nothing. The database refuses dividends
 that don't match its own count of the holdings."""
+import tempfile
 import time
 import unittest
 from datetime import datetime, timedelta, timezone
+
+from openpyxl import load_workbook
 
 import online
 from helpers import ECON, FakeFeed
 from engine import ledger as L, nightly as N, pricing, robot
 from engine.online import OnlineError
+from tools import hand_check
 
 SEASON = "zz-robot"
 RATE = 0.1
@@ -203,6 +207,45 @@ class Robot(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("set-aside", out)
         self.assertIsNone(self.p.select("robot_status", season_id=f"eq.{SEASON}")[0]["stop_reason"])
+
+    def test_d_hand_check_reads_the_database(self):
+        t2 = self.today + timedelta(days=2)
+        p1, p2 = self.ph[:2]
+        m = self.league([p1, p2], ends=t2 + timedelta(days=1))
+        # A, whose earlier games here were either before today's trades or set aside: holdings only count from now.
+        self.order(p1, m, A, "buy", "market", 100)
+        book = p1.rpc("order_book", p_market=m, p_athlete=ONLINE(A))["market_maker"]
+        price = (book["sells_from_cents"] + book["buys_from_cents"]) // 2
+        self.order(p1, m, A, "sell", "limit", 30, price)
+        self.order(p2, m, A, "buy", "market", 30)  # player to player, so the seller's holding falls too
+        stats = {"rush_yd": 90, "rush_td": 1}
+        gid = self.game("ge", datetime(t2.year, t2.month, t2.day, 13, tzinfo=L.EASTERN), A, stats)
+        self.sync()
+        code, out = self.run_robot(t2 + timedelta(days=1))
+        self.assertEqual(code, 0, out)
+        paid = {d["member_id"]: d for d in self.dividends(gid) if d["market_id"] == m}
+        members = {r["display_name"]: r["id"] for r in self.p.select("members", market_id=f"eq.{m}")}
+        self.assertEqual(sorted(d["shares"] for d in paid.values()), [30, 70])
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            for name, member in members.items():
+                conn = hand_check.online_save(self.p, SEASON, m, member)
+                path = hand_check.write_week(conn, self.week, out_dir)
+                self.assertTrue(hand_check.recalculate(path))
+                lines, bad = hand_check.results(path)
+                self.assertGreater(lines, 0)
+                self.assertEqual(bad, 0, name)
+                wb = load_workbook(path, data_only=True)["Check"]
+                self.assertAlmostEqual(wb["C4"].value, paid[member]["cents"] / 100, 2)
+                self.assertAlmostEqual(wb["C5"].value, paid[member]["cents"] / 100, 2)
+
+            # A wrong amount in the data must show as a mismatch, or the checks above prove nothing.
+            conn = hand_check.online_save(self.p, SEASON, m, members["R1"])
+            conn.execute("DROP TRIGGER dividends_are_final_u")
+            conn.execute("UPDATE dividends SET cents = cents + 1 WHERE game_id = ?", (gid,))
+            path = hand_check.write_week(conn, self.week, out_dir)
+            self.assertTrue(hand_check.recalculate(path))
+            self.assertEqual(hand_check.results(path)[1], 1)
 
 
 if __name__ == "__main__":
