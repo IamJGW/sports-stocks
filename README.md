@@ -21,6 +21,9 @@ Fantasy sports dressed as a stock exchange. Design and roadmap: `PROJECT_PLAN.md
 | Try things on a copy of the save | `python3 serve.py --save path/to/copy.sqlite` |
 | Hand-check workbook for a week | `python3 tools/hand_check.py --week 6` |
 | Run the tests | `python3 tests/run.py` |
+| Run the browser flows (real Chrome, desktop and iPhone size; screenshots in `checks/browser/`) | `python3 tests/browser/flows.py`, add `--target live` for the public site |
+| Set the sign-in emails on a project | `python3 tools/auth_setup.py test` |
+| Hand check for one player in an online league | `python3 tools/hand_check.py --online --target test --league CODE --player "Name"` |
 
 ## The automatic morning run
 

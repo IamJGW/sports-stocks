@@ -10,6 +10,7 @@ Nothing here prints a key.
 """
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -127,17 +128,25 @@ class Management:
         if not self.token:
             raise OnlineError("No access token. Run: python3 tools/set_key.py token")
 
+    def _call(self, method, path, body=None):
+        """A management request, tried again if Supabase's gateway hiccups (502 to 504, which pass in seconds)."""
+        for wait in (3, 8, 15, 0):
+            try:
+                return _request(method, f"{MANAGEMENT}/projects/{self.ref}/{path}",
+                                {"Authorization": f"Bearer {self.token}"}, body)[1]
+            except OnlineError as e:
+                if not str(e).startswith(("502", "503", "504")) or not wait:
+                    raise
+                time.sleep(wait)
+
     def sql(self, query):
         """Run SQL; returns the last statement's rows as a list of dicts."""
-        return _request("POST", f"{MANAGEMENT}/projects/{self.ref}/database/query",
-                        {"Authorization": f"Bearer {self.token}"}, {"query": query})[1]
+        return self._call("POST", "database/query", {"query": query})
 
     def auth_config(self):
         """The project's sign-in settings, as a dict. Holds secrets: never print it whole."""
-        return _request("GET", f"{MANAGEMENT}/projects/{self.ref}/config/auth",
-                        {"Authorization": f"Bearer {self.token}"})[1]
+        return self._call("GET", "config/auth")
 
     def update_auth_config(self, fields):
         """Change only the sign-in settings named in fields."""
-        return _request("PATCH", f"{MANAGEMENT}/projects/{self.ref}/config/auth",
-                        {"Authorization": f"Bearer {self.token}"}, fields)[1]
+        return self._call("PATCH", "config/auth", fields)

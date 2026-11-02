@@ -554,3 +554,37 @@ that its fair values match the Mac's save), then Justin's OK to switch off the M
   of them would need a new phone function, so Opus and a migration). Other players' holdings show shares, not worth.
 - `.claude/launch.json` has `sports-stocks-web` (static server on port 8661) for previewing `web/`.
 - Still to do before live: repeat the Supabase SMTP and email-template setup on the live project (items 7-8).
+
+**2026-10-30, step 6: GitHub Pages, done; gate check started** (Sonnet medium).
+
+- `.github/workflows/pages.yml` publishes `web/` only. Live at https://iamjgw.github.io/sports-stocks/ (all files 200; opened by
+  Justin on a computer and a phone, both fine). Still points at the TEST project.
+- Gate check (30 Oct): the nightly robot has only two hand-started runs (one failure, one success, 29 Oct evening) and no
+  scheduled run yet, so 0 of 3 clean nights. The first scheduled runs are the morning of 30 Oct; three clean nights
+  (30, 31 Oct, 1 Nov) plus the fair-value match with the Mac's save each morning are due before Tuesday 3 Nov.
+- Decided with Justin: the rest of step 3 (live migrations, season upload, live secret, Mac 4:00 job off, live SMTP and
+  template, `config.js` to live, nightly `--target live`) waits until about Tue 3 Nov, each part with his OK.
+
+**2026-11-01, ready for the two-house test** (Opus; test project and the public site, nothing on live). Criteria and
+evidence are in `MILESTONE_ACCEPTANCE.md`. 108 tests pass; 34 of 34 browser flows locally; 32 of 32 on
+https://iamjgw.github.io/sports-stocks/ at desktop and iPhone size, with real emailed codes typed by Justin.
+
+- **Sign-in was broken for every new player.** Supabase sends a new address its "confirmation" email, not the "magic link"
+  one, and that template was still the default: no code, and a link to `localhost:3000`. `tools/auth_setup.py` now sets
+  both emails to the 6-digit code, and `site_url` to the public site. It has run on the test project; **it must run on
+  live as part of the switch** (`python3 tools/auth_setup.py live --yes-live`, with Justin's OK, after his SMTP setup).
+- `db/migrations/006_market_list.sql` (test project only): `market_list`, a tenth phone function, gives the Market screen
+  each athlete's last trade, best bid and best offer. It reads only, leaves out sleeping orders and an absent market
+  maker, and agrees with `order_book`.
+- The athlete page's 5-second check now also refreshes my open orders and the trades. Before, a friend filling your order
+  didn't show until you left the page, so "both see the trade" would have failed in step 7.
+- Add to home screen: `web/manifest.webmanifest`, icons from `tools/make_icons.py`. Tap targets of 32 px or more. A wrong code gets
+  a plain message and a pasted space is ignored. The new-league date uses the Eastern day (in the evening it was tomorrow).
+- `tools/hand_check.py --online --league CODE --player NAME` reads a league player's trades and dividends from the
+  database, player-to-player trades included, so step 7's morning check exists.
+- `tests/browser/`: real Chrome driven with the standard library, no installs. `TWO_HOUSE_CHECKLIST.md` and the survey
+  `sports-stocks-two-houses` are ready for step 7.
+- Gate: the robot is green on 30 Oct, 31 Oct and 1 Nov, including after migration 006, and its 120 fair values match the Mac's save
+  exactly. Only one real game was paid in those nights, so check the 1 Nov Sunday slate on the morning of 2 Nov before the switch.
+
+Migrations for the switch now include 006. Next: the live switch, about Tue 3 Nov, each part with Justin's OK; then step 7.

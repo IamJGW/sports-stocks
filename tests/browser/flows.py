@@ -143,6 +143,7 @@ class Run:
 
     def human_sign_in(self, flow, how):
         t = self.tab
+        t.send("Page.bringToFront")
         print(f"\n>>> {self.viewport} window, {flow}: type {how} and press Send code.", flush=True)
         t.wait("!!document.querySelector('#code')", HUMAN_WAIT, "the code screen")
         print(f">>> {self.viewport}: wait for the script's wrong test code to be refused.", flush=True)

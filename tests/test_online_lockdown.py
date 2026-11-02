@@ -43,7 +43,9 @@ class Lockdown(unittest.TestCase):
 
     def test_signed_in_phone_sees_no_league_it_isnt_in(self):
         phone = online.phones(1)[0]
-        mine = {r["market_id"] for r in phone.select("members", user_id=f"eq.{phone.user_id}")}
+        # The whole list, read with the secret key: test users are in over a thousand leagues by now, and a phone's own
+        # request stops at 1,000 rows, so its list and the rows it is checked against could be different thousands.
+        mine = {r["market_id"] for r in online.project()[0].select("members", user_id=f"eq.{phone.user_id}")}
         for t in ["members", "trades", "dividends", "reports"]:
             self.assertTrue({r["market_id"] for r in phone.select(t)} <= mine, t)
         self.assertTrue({r["id"] for r in phone.select("markets")} <= mine)
