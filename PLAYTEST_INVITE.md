@@ -37,15 +37,16 @@ How to play:
 iPhone tip: in Safari tap Share, then "Add to Home Screen" for an app icon. You'll sign in once more there.
 
 This is a test season: in a couple of weeks the game moves to its permanent home and leagues start fresh.
-After a few days of playing, please fill in a 5-minute survey: [SURVEY LINK]
+After a few days of playing, please fill in a 5-minute survey: https://iamjgw.github.io/sports-stocks/survey.html
 ```
 
 ## The survey
 
-- **Phone-friendly page:** `playtest/out/sports-stocks-friends-first-look.html` (its "Copy my answers" button lets
-  testers paste their answers to you in a text). It needs a web address before you can send it; see the next step in
-  the conversation.
-- **Text version, works today:** paste `playtest/out/sports-stocks-friends-first-look.txt` into a text or email in
-  place of `[SURVEY LINK]`; testers type answers under each question and reply.
+https://iamjgw.github.io/sports-stocks/survey.html (already in the message above). Testers tap **Copy my answers** at
+the end and paste them to you in a text. If someone would rather not use the page, paste
+`playtest/out/sports-stocks-friends-first-look.txt` into a message instead; they type answers under each question.
+
+The page is a copy of `playtest/out/sports-stocks-friends-first-look.html`: after changing the survey, run
+`python3 playtest/build.py` and copy it to `web/survey.html` again.
 
 When answers come back, paste them into a Sports Stocks conversation with Claude.
