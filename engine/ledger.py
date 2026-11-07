@@ -68,8 +68,21 @@ def eastern_day(dt):
     return dt.astimezone(EASTERN).date().isoformat()
 
 
+def kickoff_record_time(kickoff):
+    """A game's record time, its kickoff, as UTC text comparable with trade times: who held shares then is paid for
+    that game. Takes ESPN's "2026-11-06T01:15Z" and the database's "2026-11-06T01:15:00+00:00" alike."""
+    text = kickoff.strip().replace(" ", "T")
+    if text.endswith("+00:00"):
+        text = text[:-6]
+    elif "+" in text[10:] or "-" in text[10:]:
+        raise ValueError(f"Kickoff {kickoff!r} isn't in UTC.")
+    text = text.rstrip("Z").split(".")[0]
+    return utc_text(parse_utc(text))
+
+
 def record_time(day):
-    """Midnight Eastern at the start of an Eastern date, in UTC text: who held shares then is paid for that day."""
+    """Midnight Eastern at the start of an Eastern date, in UTC text. Since 7 Nov 2026 dividends use each game's
+    kickoff instead (kickoff_record_time); this is now only the start of a day for day-long windows."""
     y, m, d = map(int, day.split("-"))
     return utc_text(datetime(y, m, d, tzinfo=EASTERN))
 

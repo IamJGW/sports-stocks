@@ -82,12 +82,18 @@ def day_rows(project, season, conn, day, parsed, report):
     q = lambda sql, *a: [dict(r) for r in conn.execute(sql, a)]  # noqa: E731
     rate = L.meta(conn, "rate")
     payouts = q(f"SELECT * FROM payouts WHERE game_id IN ({marks})", *ids)
+    # Record time is each game's kickoff: the database lists the day's games with their kickoffs, and the holdings at
+    # every kickoff that day. A game's payouts go to the holders at its own kickoff.
+    got = project.rpc("robot_game_holders", p_season=season, p_day=day)
+    kick = {g: L.kickoff_record_time(k) for g, k in got["games"].items()}
     holders = {}
-    for h in project.rpc("robot_holders", p_season=season, p_day=day):
-        holders.setdefault(h["athlete_id"], []).append(h)
+    for h in got["holders"]:
+        holders.setdefault((L.kickoff_record_time(h["kickoff"]), h["athlete_id"]), []).append(h)
     dividends = []
     for p in payouts:
-        for h in holders.get(pre + p["athlete_id"], []):
+        if pre + p["game_id"] not in kick:
+            raise OnlineError(f"Game {pre + p['game_id']} isn't one of the database's games on {day}.")
+        for h in holders.get((kick[pre + p["game_id"]], pre + p["athlete_id"]), []):
             dividends.append({"market_id": h["market_id"], "game_id": pre + p["game_id"], "athlete_id": h["athlete_id"],
                               "member_id": h["member_id"], "shares": h["shares"],
                               "cents": N.dividend_cents(h["shares"], p["points"], rate, p["boost"])})

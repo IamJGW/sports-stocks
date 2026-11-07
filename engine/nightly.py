@@ -91,7 +91,6 @@ def process_day(conn, day, parsed, now):
     sport = L.meta(conn, "sport")
     rate = L.meta(conn, "rate")
     weights = econ["sports"][sport]["scoring"]
-    rec = L.record_time(day)
     paid_at = L.utc_text(now)
     athletes = {r["id"]: r for r in conn.execute("SELECT * FROM athletes")}
     before_fv = {i: a["fair_value"] for i, a in athletes.items()}
@@ -99,6 +98,7 @@ def process_day(conn, day, parsed, now):
     conn.execute("BEGIN IMMEDIATE")
     try:
         for g, p in parsed:
+            rec = L.kickoff_record_time(g["kickoff"])   # who held shares at this game's kickoff is paid for it
             boost = econ["live"]["playoff_boost"] if g["playoff"] else 1.0
             for aid, line in p["lines"].items():
                 if aid not in athletes:

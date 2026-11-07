@@ -26,15 +26,25 @@ class Nightly(unittest.TestCase):
             out.append(N.process_day(self.c, day, N.fetch_day(self.c, day, self.feed), now))
         return out
 
-    def test_holders_at_midnight_are_paid_and_later_buyers_are_not(self):
+    def test_holders_at_kickoff_are_paid_and_later_buyers_are_not(self):
         L.trade(self.c, "you", self.a["ticker"], "buy", 100, eastern(2026, 9, 12, 23, 59))   # Saturday night
-        L.trade(self.c, "you", self.a["ticker"], "buy", 50, eastern(2026, 9, 13, 0, 1))       # Sunday 12:01 a.m.
+        L.trade(self.c, "you", self.a["ticker"], "buy", 30, eastern(2026, 9, 13, 12, 59))    # Sunday, a minute before kickoff
+        L.trade(self.c, "you", self.a["ticker"], "buy", 50, eastern(2026, 9, 13, 13, 0))     # at kickoff: too late
+        L.trade(self.c, "you", self.a["ticker"], "buy", 20, eastern(2026, 9, 13, 14))        # during the game
         self.run_night(2026, 9, 14)
         d = self.c.execute("SELECT * FROM dividends").fetchone()
-        self.assertEqual(d["shares"], 100)
-        self.assertEqual(d["cents"], round(100 * 26.0 * self.rate * 100))
+        self.assertEqual(d["shares"], 130)
+        self.assertEqual(d["cents"], round(130 * 26.0 * self.rate * 100))
+        self.assertEqual(self.c.execute("SELECT record_time FROM payouts WHERE athlete_id = ?", (self.a["id"],))
+                         .fetchone()[0], L.utc_text(eastern(2026, 9, 13, 13)))
         self.assertEqual(L.cash_cents(self.c, "you"),
                          100_000_00 + sum(r["cents"] for r in self.c.execute("SELECT cents FROM trades")) + d["cents"])
+
+    def test_selling_before_kickoff_gives_up_the_dividend(self):
+        L.trade(self.c, "you", self.a["ticker"], "buy", 100, eastern(2026, 9, 10))
+        L.trade(self.c, "you", self.a["ticker"], "sell", 100, eastern(2026, 9, 13, 9))       # Sunday morning
+        self.run_night(2026, 9, 14)
+        self.assertEqual(self.c.execute("SELECT COUNT(*) FROM dividends").fetchone()[0], 0)
 
     def test_bad_game_pays_zero_never_charges(self):
         L.trade(self.c, "you", self.b["ticker"], "buy", 100, eastern(2026, 9, 10))

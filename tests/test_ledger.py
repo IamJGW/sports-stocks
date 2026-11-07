@@ -65,6 +65,15 @@ class Trading(unittest.TestCase):
         back = L.quote_trade(self.c, "you", self.a["ticker"], "sell", 900, NOW)["cents"]
         self.assertEqual(held["value_cents"], back)
 
+    def test_kickoff_record_time_reads_espn_and_database_formats_alike(self):
+        for text in ("2026-11-06T01:15Z", "2026-11-06T01:15:00Z", "2026-11-06T01:15:00+00:00",
+                     "2026-11-06 01:15:00+00:00", "2026-11-06T01:15:00.000+00:00"):
+            self.assertEqual(L.kickoff_record_time(text), "2026-11-06T01:15:00Z", text)
+        # Comparable with trade times as text: a trade 30 s after kickoff is not before it.
+        self.assertFalse("2026-11-06T01:15:30Z" < L.kickoff_record_time("2026-11-06T01:15Z"))
+        with self.assertRaises(ValueError):
+            L.kickoff_record_time("2026-11-05T20:15:00-05:00")
+
     def test_record_time_is_midnight_eastern(self):
         self.assertEqual(L.record_time("2026-09-13"), "2026-09-13T04:00:00Z")   # EDT
         self.assertEqual(L.record_time("2026-12-06"), "2026-12-06T05:00:00Z")   # EST

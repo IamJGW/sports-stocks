@@ -24,7 +24,8 @@ class HandCheck(unittest.TestCase):
         })
         L.trade(self.c, "you", a["ticker"], "buy", 137, eastern(2026, 9, 10))
         L.trade(self.c, "you", a["ticker"], "sell", 37, eastern(2026, 9, 12, 20))
-        L.trade(self.c, "you", a["ticker"], "buy", 500, eastern(2026, 9, 13, 0, 1))       # after record time: not paid
+        L.trade(self.c, "you", a["ticker"], "buy", 25, eastern(2026, 9, 13, 12, 59))      # game day, before kickoff: paid
+        L.trade(self.c, "you", a["ticker"], "buy", 500, eastern(2026, 9, 13, 13, 1))      # after kickoff: not paid
         L.trade(self.c, "you", b["ticker"], "buy", 61, eastern(2026, 9, 11))
         now = eastern(2026, 9, 14, 4)
         N.sync_schedule(self.c, feed, weeks=[1])

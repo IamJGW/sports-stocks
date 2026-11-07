@@ -181,9 +181,9 @@ could watch a three-touchdown first half and buy at yesterday's price.</p>
 </div>
 <h3>The fine print</h3>
 <ul>
-  <li><b>Who gets paid:</b> whoever held the shares at <b>midnight Eastern</b> at the start of game day. Buying on
-  Sunday morning doesn't get you Sunday's games; buying on Saturday night does. Selling on Sunday morning still gets
-  you Sunday's dividend.</li>
+  <li><b>Who gets paid:</b> whoever held the shares when the game <b>kicked off</b>. Buying any time before
+  kickoff, even an hour before, gets you that game's dividend; buying once it has started doesn't. Selling before
+  kickoff gives that game's dividend up.</li>
   <li><b>Bad games:</b> a game with negative points pays nothing. It never costs you money.</li>
   <li><b>Playoffs:</b> playoff games pay {pts(live['playoff_boost'])}× the normal dividend.</li>
   <li><b>When:</b> dividends land in your cash in the overnight update after the game.</li>

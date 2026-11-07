@@ -49,7 +49,7 @@ smaller rate per game.
 > you're paid $1.20 a share, or $120. An NBA player scoring the same fantasy points pays much less per game because he
 > plays about five times as often.
 
-**Record time.** Dividends for a day's games go to whoever held the shares when that day began (midnight Eastern).
+**Record time.** A game's dividend goes to whoever held the shares at its kickoff (changed from midnight Eastern at the start of game day on 7 Nov 2026, migration 007).
 Buying a player halfway through a game he's dominating doesn't earn you that game. This is the same idea as a real
 stock's "record date", and it lets us update stats once a night instead of live.
 
@@ -215,7 +215,7 @@ Milestone 0 is done. Milestone 1's plan is `MILESTONE_1_PLAN.md`.
 |---|---|
 | A free stats feed changes or disappears | One adapter per sport with a backup source; the nightly job alerts us instead of paying wrong dividends |
 | One sport turns out to be the "obvious" pick | Position-group factors set from past seasons; the market maker re-checks them weekly in season; re-calibrate each year with the new season's data |
-| Someone games the market (buying mid-game from the market maker, pumping a price) | Record time at midnight, market maker steps out during games, net worth valued at the buy-side price, holding cap |
+| Someone games the market (buying mid-game from the market maker, pumping a price) | Record time at kickoff, market maker steps out during games, net worth valued at the buy-side price, holding cap |
 | The market maker is too generous (easy free money) or too stingy (nothing to trade with) | Its gap and depth are workbook settings; we simulate a season against it before the beta and watch it during the beta |
 | Order-matching bugs move money wrongly | Matching runs in one place on the server; every trade is logged; the beta includes a hand audit; Opus reviews this code |
 | Supabase pauses free projects after a week with no activity | The nightly robot touches it every day, so it never goes idle |

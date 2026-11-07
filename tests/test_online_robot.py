@@ -110,7 +110,8 @@ class Robot(unittest.TestCase):
         self.order(p3, l2, B, "buy", "market", 40)
         waiting = self.order(p3, l2, C, "buy", "limit", 10, 100)
 
-        # Today's game for A kicks off now (bought after midnight: no dividend); tomorrow's for B (held at midnight).
+        # Record time is kickoff. A's game is given a kickoff 30 s ago, just after the buys above went in, so those
+        # buys came after kickoff: no dividend. B's game is tomorrow, so the buys above are before its kickoff: paid.
         kick = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(seconds=30)
         if L.eastern_day(kick) != t.isoformat():
             self.skipTest("Too close to midnight Eastern.")
@@ -129,7 +130,7 @@ class Robot(unittest.TestCase):
         self.assertIn(f"{t.isoformat()}: 1 games", out)
         self.assertIn(f"{t1.isoformat()}: 1 games", out)
 
-        self.assertEqual(self.dividends(ga), [])  # nobody held A at today's midnight
+        self.assertEqual(self.dividends(ga), [])  # nobody held A at its kickoff
         gb_paid = {(d["market_id"], d["shares"]): d["cents"] for d in self.dividends(gb) if d["market_id"] in (l1, l2)}
         self.assertEqual(gb_paid, {(l1, 100): N.dividend_cents(100, b_pts, RATE, 1.0)})  # not l2: it ended today
         self.assertAlmostEqual(self.p.select("payouts", game_id=f"eq.{ONLINE(gb)}")[0]["per_share"], b_pts * RATE, 12)
